@@ -11,7 +11,8 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+
+import pandas as pd
 
 from reporter import render_report
 from validators import (
@@ -21,9 +22,6 @@ from validators import (
     check_subgroup_degradation,
     compute_pooled_metric,
 )
-
-if TYPE_CHECKING:
-    import pandas as pd
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -42,7 +40,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 def _load_predictions(path: Path) -> pd.DataFrame:
     """Load the predictions table (Phase 1: read the CSV with pandas)."""
-    raise NotImplementedError
+    return pd.read_csv(path)
 
 
 def _assemble_payload(df: pd.DataFrame) -> ReportPayload:

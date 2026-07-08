@@ -10,8 +10,12 @@ Phase 1 fills in the Anthropic call; :func:`render_report` is a stub until then.
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+from anthropic import Anthropic
 
 if TYPE_CHECKING:
     from validators import ReportPayload
@@ -29,8 +33,13 @@ __all__ = ["render_report", "MODEL", "API_KEY_ENV", "SYSTEM_PROMPT_PATH"]
 
 
 def _load_system_prompt() -> str:
-    """Read the reviewer system prompt from disk (never duplicated inline)."""
-    return SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+    """Read the operative reviewer system prompt from disk.
+
+    The file opens with a short Markdown doc header; the operative prompt is the
+    content after the first ``---`` separator. Only that part is returned.
+    """
+    text = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+    return text.split("---", 1)[1].strip()
 
 
 def render_report(payload: ReportPayload) -> str:
@@ -41,4 +50,11 @@ def render_report(payload: ReportPayload) -> str:
     payload as JSON to ``claude-opus-4-8``, and returns the report text. The key
     is never hard-coded.
     """
-    raise NotImplementedError
+    client = Anthropic(api_key=os.environ[API_KEY_ENV])
+    message = client.messages.create(
+        model=MODEL,
+        max_tokens=1024,
+        system=_load_system_prompt(),
+        messages=[{"role": "user", "content": json.dumps(payload)}],
+    )
+    return message.content[0].text

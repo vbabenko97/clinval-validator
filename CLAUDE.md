@@ -16,7 +16,7 @@ Named user: a clinical-AI researcher / radiology-lab PhD student who trained a m
 
 - All metrics, statistical tests, and pass/fail flags are computed by deterministic Python. Never ask an LLM to compute AUC, run a bootstrap, or decide a flag.
 - Claude (Anthropic API, `claude-opus-4-8`) is used **only** to turn the deterministic layer's structured JSON into prose: the risk report, reviewer-style critique, next-step suggestions. See the reporter contract in [prompts/opus-4-8/reporter_system_prompt.md](prompts/opus-4-8/reporter_system_prompt.md) — it may cite only numbers present in the JSON.
-- Layers stay cleanly separable: `validators/` (pure Python, no network, runs fully offline) and `reporter/` (the only code that touches the network).
+- Layers stay cleanly separable: `clinval_validators/` (pure Python, no network, runs fully offline) and `reporter/` (the only code that touches the network).
 
 ## Repo map — current state
 
@@ -29,7 +29,7 @@ What exists:
 - [AGENTS.md](AGENTS.md) — Codex/GPT behavioral rules (also govern Claude).
 
 To build (MVP — see Scope):
-- `validators/` — deterministic checks (leakage, split audit, subgroup degradation) → structured JSON.
+- `clinval_validators/` — deterministic checks (leakage, split audit, subgroup degradation) → structured JSON.
 - `reporter/` — feeds validator JSON to Claude, renders the risk report.
 - `data/` — the demo input table (copy/symlink a fixture from `claude-science-artifacts/scenarios/`).
 - `tests/` — unit tests (see Definition of done).

@@ -8,8 +8,8 @@ completely before starting any Phase 2 item.
 - [x] `README.md` — full project README (purpose, disclaimer, MVP scope, schema, quickstart, demo narrative, MIT).
 - [x] `PROJECT_PLAN.md` — problem, user, MVP, non-goals, architecture, checks, report plan, risks, demo, stretch.
 - [x] `TASKS.md` — this staged checklist.
-- [x] `validators/checks.py` — contract TypedDicts + 4 typed check stubs (`raise NotImplementedError`).
-- [x] `validators/__init__.py` — re-exports the contract + checks.
+- [x] `clinval_validators/checks.py` — contract TypedDicts + 4 typed check stubs (`raise NotImplementedError`).
+- [x] `clinval_validators/__init__.py` — re-exports the contract + checks.
 - [x] `reporter/report.py` — `render_report` stub; `_load_system_prompt`; `MODEL`/`API_KEY_ENV`/`SYSTEM_PROMPT_PATH`.
 - [x] `reporter/__init__.py` — re-exports `render_report` + constants.
 - [x] `cli.py` — argparse entrypoint wiring (load → validators → assemble → reporter → print).
@@ -34,7 +34,7 @@ completely before starting any Phase 2 item.
 - [ ] `tests/test_validators.py::test_subgroup_degradation_is_detectable` passes on `subgroup_scanner_degradation` (flagged AUC ≈ 0.62 vs pooled ≈ 0.83). Remove its `xfail`.
 
 ### Report JSON contract
-- [x] `ReportPayload` + `LeakageResult`/`SplitAuditResult`/`SubgroupResult`/`PooledMetric` defined in `validators/checks.py`.
+- [x] `ReportPayload` + `LeakageResult`/`SplitAuditResult`/`SubgroupResult`/`PooledMetric` defined in `clinval_validators/checks.py`.
 - [ ] `cli._assemble_payload` returns a `ReportPayload` that matches the reporter prompt shape (assert against a hand-checked JSON in a test).
 
 ### Check 4 — Claude report step

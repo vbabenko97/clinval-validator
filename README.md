@@ -10,7 +10,7 @@ started 2026-07-07.
 
 **Python computes the metrics; Claude explains the risk.** Every metric,
 statistical test, and pass/fail flag is computed by deterministic Python in
-`validators/` (runs fully offline). Claude (`claude-opus-4-8`) is used only to
+`clinval_validators/` (runs fully offline). Claude (`claude-opus-4-8`) is used only to
 turn that structured JSON into prose in `reporter/` — it never computes a number.
 
 > **Disclaimer.** Synthetic / public-schema data only, modeled on the RSNA

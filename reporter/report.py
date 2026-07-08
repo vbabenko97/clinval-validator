@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 from anthropic import Anthropic
 
 if TYPE_CHECKING:
-    from validators import ReportPayload
+    from clinval_validators import ReportPayload
 
 MODEL = "claude-opus-4-8"
 API_KEY_ENV = "ANTHROPIC_API_KEY"

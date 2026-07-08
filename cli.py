@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 from reporter import render_report
-from validators import (
+from clinval_validators import (
     ReportPayload,
     audit_split_quality,
     check_patient_leakage,

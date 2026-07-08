@@ -23,7 +23,7 @@ dev = ["pytest"]
 clinval-validate = "cli:main"
 
 [tool.setuptools]
-packages = ["validators", "reporter"]
+packages = ["clinval_validators", "reporter"]
 py-modules = ["cli"]
 
 [tool.pytest.ini_options]

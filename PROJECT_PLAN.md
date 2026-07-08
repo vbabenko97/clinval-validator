@@ -44,7 +44,7 @@ whole path is captured in a <3-minute demo. Four checks:
 predictions.csv
    │
    ▼
-validators/   (pure Python, offline, no network imports)
+clinval_validators/   (pure Python, offline, no network imports)
    check_patient_leakage / audit_split_quality /
    check_subgroup_degradation / compute_pooled_metric
    │  → ReportPayload (TypedDict contract)
@@ -57,7 +57,7 @@ cli.py  wires: load CSV → validators → assemble payload → reporter → pri
 ```
 
 The contract (`ReportPayload` and its parts) is defined once in
-`validators/checks.py` and re-exported from `validators/__init__.py`. The
+`clinval_validators/checks.py` and re-exported from `clinval_validators/__init__.py`. The
 reporter imports it for typing only; validators never import the reporter. This
 keeps the compute layer runnable with no network and no LLM dependency.
 
@@ -78,7 +78,7 @@ nothing; validators read scenarios directly.
 
 ## The four Phase-1 checks
 
-| # | Function (`validators/checks.py`) | Reads | Produces (contract field) |
+| # | Function (`clinval_validators/checks.py`) | Reads | Produces (contract field) |
 |---|---|---|---|
 | 1 | `check_patient_leakage` | `patient_id`, `split` | `leakage` |
 | 2 | `audit_split_quality` | `patient_id`/`site_id`, `y_true`, `y_prob`, `split` | `split_audit` |

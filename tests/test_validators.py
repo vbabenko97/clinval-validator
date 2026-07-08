@@ -8,7 +8,7 @@ import pytest
 
 pd = pytest.importorskip("pandas")
 
-from validators import (  # noqa: E402
+from clinval_validators import (  # noqa: E402
     audit_split_quality,
     check_patient_leakage,
     check_subgroup_degradation,

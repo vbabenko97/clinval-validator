@@ -26,9 +26,14 @@ def _load(scenario: str) -> pd.DataFrame:
 
 
 def test_detects_train_test_patient_overlap(demo_csv_path: Path) -> None:
-    result = check_patient_leakage(pd.read_csv(demo_csv_path))
+    df = pd.read_csv(demo_csv_path)
+    result = check_patient_leakage(df)
     assert result["overlapping_patient_ids"] == 940
-    assert 0.0 < result["leakage_rate"] < 1.0
+    # Pinned definition: overlap / distinct patients in (train ∪ test) = 940 / 1999.
+    train = set(df.loc[df["split"] == "train", "patient_id"])
+    test = set(df.loc[df["split"] == "test", "patient_id"])
+    assert result["leakage_rate"] == pytest.approx(940 / len(train | test))
+    assert result["leakage_rate"] == pytest.approx(0.4702, abs=1e-4)
 
 
 def test_leakage_zero_on_clean_grouped_split() -> None:
@@ -40,6 +45,12 @@ def test_leakage_zero_on_clean_grouped_split() -> None:
 def test_detects_duplicate_row_leaked_patients() -> None:
     result = check_patient_leakage(_load("duplicate_row_leakage"))
     assert result["overlapping_patient_ids"] == 113
+
+
+def test_detects_optimistic_site_shortcut_leakage() -> None:
+    # The demo's dramatic case: inflated AUC co-occurs with detectable leakage.
+    result = check_patient_leakage(_load("optimistic_site_shortcut"))
+    assert result["overlapping_patient_ids"] == 990
 
 
 # --- Pooled metric -------------------------------------------------------

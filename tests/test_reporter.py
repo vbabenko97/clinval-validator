@@ -39,6 +39,7 @@ def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
     assert report_text == "RED: leakage present"
     assert captured["api_key"] == "test-key"
     assert captured["model"] == MODEL == "claude-opus-4-8"
+    assert captured["max_tokens"] == 1024
 
     user_message = captured["messages"][0]
     assert user_message["role"] == "user"

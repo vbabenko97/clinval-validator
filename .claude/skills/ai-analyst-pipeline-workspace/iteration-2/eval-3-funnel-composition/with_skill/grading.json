@@ -1,0 +1,100 @@
+{
+  "expectations": [
+    {
+      "text": "A valid Jupyter notebook file (analysis.ipynb) exists as the final deliverable (nbformat valid JSON, has cells)",
+      "passed": true,
+      "evidence": "analysis.ipynb parses as valid JSON with nbformat=4, nbformat_minor=5, and 24 cells (12 markdown + 12 code). File size 494336 bytes."
+    },
+    {
+      "text": "Notebook correctly confirms that aggregate conversion is roughly flat (8-9% range, small delta)",
+      "passed": true,
+      "evidence": "Cell 0 headline: 'aggregate visit-to-conversion rate looks stable (8.67% Jan -> 8.76% Jun; p=0.75)'. Cell 4 Beat 1: 'monthly visit-to-conversion rate stayed in a narrow band (8.66%-9.25%) with no statistically significant slope'. Verified against funnel_monthly.csv: computed aggregate CVR is 8.67% (Jan), 9.05%, 8.66%, 9.25%, 8.95%, 8.76% (Jun) -- matches exactly."
+    },
+    {
+      "text": "Notebook surfaces that new-user conversion improved substantially over the period",
+      "passed": true,
+      "evidence": "Cell 6 Beat 2: 'New-user conversion rate climbs from 5.24% to 7.37% (+41% relative) -- a highly significant upward trend (p=0.0014)'. Cell 0 executive summary: 'new-user conversion climbed +2.13pp (+41% relative)'. Verified against CSV: new-user CVR 5.24% Jan, 7.37% Jun -- exact match."
+    },
+    {
+      "text": "Notebook surfaces that returning-user conversion regressed over the period",
+      "passed": true,
+      "evidence": "Cell 6 Beat 2: 'Returning-user conversion rate drops from 13.81% to 9.93% (-28% relative) -- equally significant (p=0.0003)'. Cell 0: 'returning-user conversion fell -3.88pp (-28% relative)'. Verified against CSV: returning CVR 13.81% Jan, 9.93% Jun -- exact match."
+    },
+    {
+      "text": "Notebook explicitly names the pattern as Simpson's Paradox OR as a composition shift",
+      "passed": true,
+      "evidence": "Multiple explicit mentions. Cell 0: 'a textbook Simpson\\'s Paradox'. Cell 8 Beat 3: 'this is a composition shift, not a volume story'. Cell 11 code comment: '# F4: Simpson\\'s Paradox decomposition'. Cell 21 validation: 'Simpson\\'s Paradox check -- direction of change within each channel'. Cell 23 appendix references Simpson's directly."
+    },
+    {
+      "text": "Notebook code cells are reproducible (contain runnable Python, not just text)",
+      "passed": true,
+      "evidence": "12 code cells contain executable Python: imports (pandas, numpy, matplotlib, scipy.linregress), DATA_PATH variable, groupby/pivot_table aggregations, linregress calls, chain-rule checks, counterfactual decomposition, and matplotlib chart generation. Cell 1 sets up %matplotlib inline. Data loading uses explicit DATA_PATH parameter for reproducibility."
+    },
+    {
+      "text": "Notebook has narrative markdown cells (not just code)",
+      "passed": true,
+      "evidence": "12 markdown cells out of 24 total (50%): Title/Headline/Executive summary (cell 0), data quality intro (cell 2), 8 Beat section narratives (cells 4, 6, 8, 10, 12, 14, 16, 18), Appendix A validation (cell 19), Appendix B/C/D caveats + reproduction + methodology (cell 23)."
+    },
+    {
+      "text": "At least 2 chart titles are action-oriented",
+      "passed": true,
+      "evidence": "All 7 main chart titles are action-oriented with embedded insight, e.g. 'Aggregate conversion rate is flat in H1 2026 -- the marketing claim is arithmetically correct' (cell 5), 'Underneath, new-user conversion rose 41% while returning-user conversion fell 28%' (cell 7), 'Visit mix flipped: returning-user share climbed from 40% to 54% in six months' (cell 9), 'Every channel shows the same split: new users up, returning users down' (cell 13), 'The movement is at visit -> signup, not post-signup -- this is an acquisition/targeting problem, not a product one' (cell 15), and more."
+    },
+    {
+      "text": "At least 3 charts are included (inline or saved as PNGs)",
+      "passed": true,
+      "evidence": "7 charts present: 7 PNG files in charts/ directory (01_aggregate_flat.png, 02_new_vs_returning_v2c.png, 03_visit_mix_shift.png, 04_waterfall_decomposition.png, 05_channel_small_multiples.png, 06_funnel_step_location.png, 07_opportunity_sizing.png) AND 7 plt.subplots() calls in notebook code cells to render inline."
+    },
+    {
+      "text": "Recommendations are included with owners and confidence grades (High/Medium/Low)",
+      "passed": true,
+      "evidence": "Cell 18 'Beat 8: Recommendations' markdown table has 4 recommendations (R1-R4) with columns: Action, Owner, Success metric, Confidence, Follow-up. Owners: 'Lifecycle + Attribution eng', 'Paid growth + CRO', 'Growth analytics', 'Data eng'. Confidence grades: R1/R2/R3 = 'High', R4 = 'Medium'. Cell also explains rationale for each grade."
+    }
+  ],
+  "summary": {
+    "passed": 10,
+    "failed": 0,
+    "total": 10,
+    "pass_rate": 1.0
+  },
+  "timing": {
+    "executor_duration_seconds": 1520.7,
+    "total_tokens": 179597
+  },
+  "claims": [
+    {
+      "claim": "Aggregate visit-to-conversion rate is 8.67% in Jan 2026 and 8.76% in Jun 2026 (flat)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Computed from funnel_monthly.csv: Jan 2026 cvr = 4854/55983 = 0.086705 (8.67%), Jun 2026 cvr = 4941/56427 = 0.087564 (8.76%). Matches notebook claim exactly."
+    },
+    {
+      "claim": "New-user conversion rose from 5.24% to 7.37% (+41% relative)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Computed from CSV: Jan new cvr = 1760/33583 = 0.052407 (5.24%); Jun new cvr = 1906/25863 = 0.073696 (7.37%). Relative change = 7.37/5.24 - 1 = +40.6%. Matches."
+    },
+    {
+      "claim": "Returning-user conversion fell from 13.81% to 9.93% (-28% relative)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Computed from CSV: Jan returning cvr = 3094/22400 = 0.138125 (13.81%); Jun returning cvr = 3035/30564 = 0.099300 (9.93%). Relative change = 9.93/13.81 - 1 = -28.1%. Matches."
+    },
+    {
+      "claim": "Visit mix shifted from 60/40 new/returning to 46/54",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Computed from CSV: Jan new share = 33583/55983 = 0.5999 (60%); Jun new share = 25863/56427 = 0.4583 (46%). Returning share Jun = 30564/56427 = 0.5417 (54%). Matches exactly."
+    },
+    {
+      "claim": "Total visits are essentially flat (~56k/month)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Monthly totals: 55983, 56516, 55118, 56005, 55929, 56427 -- all within ~1.3k of 56k, confirming essentially flat."
+    }
+  ],
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Exceptional execution across all 10 assertions -- a reference-quality output. The notebook (24 cells: 12 markdown narrative + 12 code) follows a clean Frame -> Explore -> Validate -> Story -> Charts -> Deliver arc. Every numeric claim cross-checked against funnel_monthly.csv matched the ground truth to 2 decimal places (aggregate 8.67% -> 8.76%, new 5.24% -> 7.37%, returning 13.81% -> 9.93%, mix 60/40 -> 46/54). The pattern is named both as 'Simpson\\'s Paradox' (headline + code comments + validation step) and as a 'composition shift' in multiple places. Chart titles are uniformly action-oriented (insight-first), not descriptive -- exceeds the >=2 bar by a wide margin with all 7 being action-oriented. Recommendations are structured as a table with explicit owners, success metrics, and High/Medium confidence grades, plus a written rationale for each grade. The supporting paper-trail (framing.md, findings.json, validation.md, storyboard.md) is extensive and consistent with the notebook. Assertions as written are appropriate for evaluating this deliverable; no changes recommended."
+  }
+}

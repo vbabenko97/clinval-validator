@@ -1,0 +1,17 @@
+{
+  "eval_id": 2,
+  "eval_name": "churn-drilldown",
+  "prompt": "customer churn spiked in q2 2026 and the board wants answers at next week's meeting. i have customer-level data in customer_churn.csv with plan tier, industry, signup and churn quarters, ARR, tenure. i need a marp slide deck - action titles, not more than 15 slides, with a clear ask at the end. the board is non-technical. what's driving the churn and what do we do about it?",
+  "assertions": [
+    "A Marp deck file (deck.md) exists with valid Marp frontmatter",
+    "Deck has 15 or fewer slides",
+    "Analysis correctly identifies Pro plan tier as the primary driver",
+    "Drill-down further identifies Retail industry within Pro",
+    "Churn rate numbers are independently re-derived",
+    "At least 2 slide titles are action-oriented",
+    "Deck follows a coherent narrative",
+    "Recommendations/asks are specific, named, with confidence grades",
+    "At least 3 charts are included as PNGs",
+    "Tone is non-technical and appropriate for a board audience"
+  ]
+}

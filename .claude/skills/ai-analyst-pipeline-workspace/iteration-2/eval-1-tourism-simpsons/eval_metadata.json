@@ -1,0 +1,17 @@
+{
+  "eval_id": 1,
+  "eval_name": "tourism-simpsons",
+  "prompt": "hey so tourism authority asked us to dig into this. my director keeps saying 'our recovery is done, visitor arrivals are back to normal' but the regional offices are complaining. the data is monthly visitor arrivals by island for 2024 and 2025, broken out by accommodation type, tier, and origin market (it's tourism_monthly.csv). can you put together a markdown report i can share with the director - what's actually going on across the islands and what should we do differently. assume the director knows the business but doesn't look at data much.",
+  "assertions": [
+    "A markdown report file (report.md) exists as the final deliverable",
+    "Report surfaces Simpson's Paradox: aggregate is roughly flat while islands diverge",
+    "Report identifies Maui as the growth outlier AND Oahu as the decline driver",
+    "Root-cause drill-down reaches at least 3 layers deep",
+    "Report contains at least 3 charts (PNGs embedded or referenced)",
+    "At least 2 chart titles are action-oriented",
+    "Report follows a clear narrative structure with Context / Tension / Resolution beats",
+    "Recommendations are ranked and each has an owner AND a confidence grade",
+    "Arithmetic was independently validated",
+    "Tone is appropriate for a director audience"
+  ]
+}

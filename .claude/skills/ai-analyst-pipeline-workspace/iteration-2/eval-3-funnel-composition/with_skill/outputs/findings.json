@@ -1,0 +1,235 @@
+{
+  "metadata": {
+    "analysis_name": "Funnel conversion composition analysis Jan-Jun 2026",
+    "prepared_for": "Growth team",
+    "data_source": "/tmp/ai-analyst-iter2/inputs/funnel_monthly.csv",
+    "hypothesis_tracker": {
+      "H1": "refuted \u2014 aggregate is flat but that masks divergent subgroups",
+      "H2": "strongly supported \u2014 user-type mix shift + divergent rates is Simpson's Paradox",
+      "H3": "partially supported \u2014 paid visits slightly down but organic up; paid not degrading faster than others",
+      "H4": "supported \u2014 new-user conv rate up +2.13pp; returning down -3.88pp",
+      "H5": "refuted \u2014 post-signup (s->c) is stable; movement is at visit-to-signup"
+    }
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "claim": "Aggregate visit-to-conversion rate is genuinely flat (8.67% Jan -> 8.76% Jun, slope +0.021pp/mo, r^2=0.028, p=0.75). The 'nothing is wrong' headline is arithmetically correct.",
+      "type": "trend",
+      "evidence": "Overall groupby('month').sum() then conversions/visits. Linear regression on 6 monthly values.",
+      "supporting_numbers": {
+        "v2c_jan": 0.0867,
+        "v2c_jun": 0.0876,
+        "slope_pp_per_month": 0.021,
+        "r_squared": 0.028,
+        "p_value": 0.75
+      },
+      "hypothesis_tested": "H1",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "groupby().sum()",
+          "pivot_table",
+          "manual loop"
+        ],
+        "simpsons_checked": true,
+        "notes": "parts-to-whole reconcile exactly"
+      }
+    },
+    {
+      "id": "F2",
+      "claim": "New-user conversion rate climbed +2.13pp (5.24% -> 7.37%, +40.6% relative) with a statistically significant upward slope (+0.43pp/mo, r^2=0.94, p=0.0014).",
+      "type": "segmentation / trend",
+      "evidence": "groupby(['month','user_type']).sum() -> conversions/visits. scipy.linregress.",
+      "supporting_numbers": {
+        "new_v2c_jan": 0.0524,
+        "new_v2c_jun": 0.0737,
+        "delta_pp": 2.13,
+        "relative_pct": 40.6,
+        "slope_pp_per_month": 0.43,
+        "r_squared": 0.94,
+        "p_value": 0.0014
+      },
+      "hypothesis_tested": "H4",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "filter+groupby",
+          "pivot_table"
+        ],
+        "simpsons_checked": true,
+        "effect_vs_noise": "r^2=0.94, p=0.0014"
+      }
+    },
+    {
+      "id": "F3",
+      "claim": "Returning-user conversion rate fell -3.88pp (13.81% -> 9.93%, -28.1% relative) with a statistically significant downward slope (-0.78pp/mo, r^2=0.97, p=0.0003).",
+      "type": "segmentation / trend",
+      "evidence": "Same pivot as F2. linregress on returning user conv rate.",
+      "supporting_numbers": {
+        "ret_v2c_jan": 0.1381,
+        "ret_v2c_jun": 0.0993,
+        "delta_pp": -3.88,
+        "relative_pct": -28.1,
+        "slope_pp_per_month": -0.78,
+        "r_squared": 0.97,
+        "p_value": 0.0003
+      },
+      "hypothesis_tested": "H2 & H4",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "filter+groupby",
+          "pivot_table",
+          "leave-one-out regression"
+        ],
+        "simpsons_checked": true,
+        "robustness": "slope -0.74 to -0.84pp/mo across all 6 leave-one-out runs"
+      }
+    },
+    {
+      "id": "F4",
+      "claim": "Visit-mix shifted from 60% new / 40% returning in Jan to 46% new / 54% returning in Jun. With rising returning share and falling returning conv rate, a textbook Simpson's Paradox masks the divergence.",
+      "type": "composition shift (Simpson's Paradox)",
+      "evidence": "Jun conv rate if Jun user_type mix had held Jan's subgroup rates = 9.88% vs actual 8.76%; if mix had stayed at Jan's shares (with Jun rates) = 8.39%. Subgroup divergence is real and opposite in direction.",
+      "supporting_numbers": {
+        "share_new_jan": 0.6,
+        "share_new_jun": 0.46,
+        "share_returning_jan": 0.4,
+        "share_returning_jun": 0.54,
+        "counterfactual_jun_with_jan_mix": 0.0839,
+        "counterfactual_jun_with_jan_rates": 0.0988
+      },
+      "hypothesis_tested": "H2",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "counterfactual decomposition (Jan mix x Jun rates, Jun mix x Jan rates)"
+        ],
+        "simpsons_checked": true,
+        "notes": "Simpson's Paradox confirmed; pattern also holds WITHIN each channel"
+      }
+    },
+    {
+      "id": "F5",
+      "claim": "Pattern holds across every channel: in paid_search, organic, email, and referral, new-user conversion rose +1.87 to +2.45pp and returning-user conversion fell -2.71 to -5.11pp. This is not channel-specific \u2014 it is systemic to user-type.",
+      "type": "root-cause drill (channel x user_type)",
+      "evidence": "groupby(['month','channel','user_type']).sum() pivot; compare Jan vs Jun v2c for each cell.",
+      "supporting_numbers": {
+        "new_delta_pp_email": 2.17,
+        "new_delta_pp_organic": 2.45,
+        "new_delta_pp_paid": 1.87,
+        "new_delta_pp_referral": 2.28,
+        "ret_delta_pp_email": -2.71,
+        "ret_delta_pp_organic": -5.01,
+        "ret_delta_pp_paid": -3.26,
+        "ret_delta_pp_referral": -5.11
+      },
+      "hypothesis_tested": "H2/H3",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "channel x user_type pivot"
+        ],
+        "simpsons_checked": true,
+        "notes": "pattern systemic, not channel-specific"
+      }
+    },
+    {
+      "id": "F6",
+      "claim": "The entire movement \u2014 both the new-user gain and the returning-user decline \u2014 is at the visit-to-signup step. Post-signup efficiency (signup-to-conversion) is stable for both user types (new: 60.1% -> 59.7%; returning: 50.9% -> 51.4%).",
+      "type": "funnel-step decomposition",
+      "evidence": "By user_type, compute signups/visits and conversions/signups monthly. New v->s: +3.62pp; new s->c: -0.40pp. Returning v->s: -7.81pp; returning s->c: +0.50pp.",
+      "supporting_numbers": {
+        "new_v2s_jan": 0.0872,
+        "new_v2s_jun": 0.1234,
+        "new_v2s_delta_pp": 3.62,
+        "new_s2c_jan": 0.6013,
+        "new_s2c_jun": 0.5973,
+        "new_s2c_delta_pp": -0.4,
+        "ret_v2s_jan": 0.2712,
+        "ret_v2s_jun": 0.1931,
+        "ret_v2s_delta_pp": -7.81,
+        "ret_s2c_jan": 0.5093,
+        "ret_s2c_jun": 0.5143,
+        "ret_s2c_delta_pp": 0.5
+      },
+      "hypothesis_tested": "H5 (refuted)",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "chain-rule check: v2c == v2s * s2c for all 48 cells, max diff 1.4e-17"
+        ],
+        "simpsons_checked": false,
+        "notes": "identity holds arithmetically"
+      }
+    },
+    {
+      "id": "F7",
+      "claim": "Traffic mix also shifted: new-user visits fell ~22% across every channel (paid_search -24%, organic -22%, email -21%, referral -21%) while returning-user visits rose 28-44% (organic +44%, referral +41%, paid_search +34%, email +28%). Total visits are effectively flat; the composition changed.",
+      "type": "segmentation \u2014 traffic",
+      "evidence": "groupby(['month','channel','user_type']).visits.sum(). Compare Jan vs Jun per cell.",
+      "supporting_numbers": {
+        "new_visits_jan_total": 33583,
+        "new_visits_jun_total": 25863,
+        "new_visits_delta_pct": -23.0,
+        "ret_visits_jan_total": 22400,
+        "ret_visits_jun_total": 30564,
+        "ret_visits_delta_pct": 36.4,
+        "paid_search_visits_jan": 25778,
+        "paid_search_visits_jun": 25426,
+        "paid_delta_pct": -1.4,
+        "organic_visits_jan": 17256,
+        "organic_visits_jun": 17958,
+        "organic_delta_pct": 4.1
+      },
+      "hypothesis_tested": "H3",
+      "confidence": "high",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "per-cell Jan vs Jun comparison",
+          "parts-to-whole reconciliation"
+        ],
+        "simpsons_checked": false,
+        "notes": "compositional shift, not a lost-traffic story \u2014 total visits flat"
+      }
+    },
+    {
+      "id": "F8",
+      "claim": "Opportunity sizing: if returning-user conv rate had held at Jan's 13.81% in June, we would have converted ~1,187 more returning users in June alone (~14,240/yr at current returning volume). If June had kept Jan's new-user volume at June's improved 7.37% rate, we would have converted ~569 additional new users that month.",
+      "type": "opportunity sizing",
+      "evidence": "Counterfactual: 30,564 June returning visits x (13.81% - 9.93%) = 1,187 missed conversions. 33,583 Jan new visits x 7.37% vs actual 1,906 = +569.",
+      "supporting_numbers": {
+        "returning_monthly_missed_conversions": 1187,
+        "returning_annualized_missed": 14240,
+        "new_monthly_volume_upside": 569
+      },
+      "hypothesis_tested": "n/a (sizing)",
+      "confidence": "medium",
+      "script": "notebooks/01_explore.py",
+      "validation": {
+        "rederived": true,
+        "methods": [
+          "counterfactual computation"
+        ],
+        "simpsons_checked": false,
+        "notes": "arithmetic verified; causal assumption about reversibility is unprovable from 6 months of data",
+        "caveat": "assumes returning-user decline is reversible and new-user gains would have held at higher volume"
+      }
+    }
+  ]
+}

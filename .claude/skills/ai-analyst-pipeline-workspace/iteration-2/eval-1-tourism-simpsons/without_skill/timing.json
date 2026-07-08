@@ -1,0 +1,8 @@
+{
+  "total_tokens": 122503,
+  "duration_ms": 887149,
+  "total_duration_seconds": 887.1,
+  "tool_uses": 81,
+  "status": "completed",
+  "notes": "Baseline reported working around Write-to-/tmp restrictions by appending script lines via python3 -c. Despite that friction, outputs were delivered."
+}

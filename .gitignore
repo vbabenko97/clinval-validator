@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Secrets / env
+.env
+.env.*
+
+# Machine-local Claude/Codex overrides (absolute paths, personal settings)
+.claude/settings.local.json
+
+# Generator default output (fixtures live in claude-science-artifcats/scenarios/ and ARE committed)
+/predictions.csv
+
+# OS
+.DS_Store

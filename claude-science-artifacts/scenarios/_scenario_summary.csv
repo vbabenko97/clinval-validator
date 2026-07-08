@@ -1,0 +1,7 @@
+scenario,rows,patients,img_prev,split,train_test_overlap,dup_leaked_pat,leakage_safe,overall_auc,subgroup_auc_in
+clean_patient_grouped,8331,2000,0.0164,patient,0,0,True,0.8598,
+weak_random_split_leakage,8342,2000,0.0152,random,940,0,False,0.8425,
+duplicate_row_leakage,8834,2000,0.016,patient,113,113,False,0.8561,
+subgroup_scanner_degradation,8347,2000,0.0141,patient,0,0,True,0.8345,0.6243
+subgroup_density_degradation,8362,2000,0.0149,patient,0,0,True,0.7339,0.6699
+optimistic_site_shortcut,8317,2000,0.015,random,990,0,False,0.9647,

@@ -1,0 +1,88 @@
+{
+  "expectations": [
+    {
+      "text": "A Marp deck file (deck.md) exists with valid Marp frontmatter (`marp: true`)",
+      "passed": true,
+      "evidence": "deck.md exists at outputs/deck.md; lines 1-15 contain valid YAML frontmatter with `marp: true` on line 2, plus theme, paginate, size, and style configuration."
+    },
+    {
+      "text": "Deck has 15 or fewer slides (count `---` separators)",
+      "passed": true,
+      "evidence": "Deck contains exactly 15 slides - splitting the file on '---' yields 16 parts (1 frontmatter block + 15 slide contents), matching the storyboard's planned 15-beat cap."
+    },
+    {
+      "text": "Analysis correctly identifies Pro plan tier as the primary driver of the Q2 2026 churn spike",
+      "passed": true,
+      "evidence": "Slide 5 ('The spike isn't the low end - Pro-tier churned 2x Starter and almost 3x Enterprise') names Pro tier as the outlier at 10.6% vs. Starter 5.3% and Enterprise 3.9%; finding F2 in findings.json codifies this."
+    },
+    {
+      "text": "Drill-down further identifies Retail industry (within Pro) as the top churn segment",
+      "passed": true,
+      "evidence": "Slide 6 ('Two cells tell the story - Pro-Retail (21.6%) and Pro-Manufacturing (14.1%)') and slide 7 ('Pro-Retail stepped from 1% to 22% in a single quarter') identify Pro-Retail as the top segment at 21.6% with a 21x step change; finding F3 confirms."
+    },
+    {
+      "text": "Churn rate numbers are independently re-derived (validation.md or explicit re-derivation section)",
+      "passed": true,
+      "evidence": "validation.md lines 6-17 contain a re-derivation table covering all 8 findings with primary method, independent method, and match status; each finding in findings.json also carries a 'validation.rederived: true' field."
+    },
+    {
+      "text": "At least 2 slide titles are action-oriented (state a conclusion, not just describe - e.g. 'Pro plan is the problem' beats 'Churn by plan')",
+      "passed": true,
+      "evidence": "At least 7 slide titles state conclusions: 'Q2-2026 churn broke trend - 92 customers left, nearly 2x the prior quarter', 'Churn rate nearly doubled - 3.5% to 6.9% quarter over quarter', 'The spike isn't the low end - Pro-tier churned 2x Starter and almost 3x Enterprise', 'Two cells tell the story - Pro-Retail (21.6%) and Pro-Manufacturing (14.1%)', 'Pro-Retail stepped from 1% to 22% in a single quarter - a break, not drift', 'It's not a renewal cliff', 'A successful save preserves ~$549K ARR'."
+    },
+    {
+      "text": "Deck follows a coherent narrative (Context -> Tension -> Resolution or equivalent)",
+      "passed": true,
+      "evidence": "storyboard.md lines 12-14 explicitly declare 'Context -> Tension -> Resolution' with a 20/30/50 mix; the deck follows it - slides 3-4 context (spike is real), slides 5-8 tension (narrow to Pro-Retail), slides 9-15 resolution (caveats, sizing, recommendations, ask)."
+    },
+    {
+      "text": "Recommendations/asks are specific, named, with confidence grades (High/Medium/Low)",
+      "passed": true,
+      "evidence": "Slide 12 contains a recommendation table with 3 actions, named owners (VP CS, CRO, Head of Product + Head of Sales), quantitative success metrics (Pro-Retail Q3-26 rate <= 8%, memo by May 2, Pro-Mfg Q3-26 rate <= 7%), and confidence grades (High, High, Medium). findings.json 'recommendations' array mirrors this."
+    },
+    {
+      "text": "At least 3 charts are included as PNGs",
+      "passed": true,
+      "evidence": "outputs/charts/ contains 8 PNG files: 03_quarterly_churn_count.png, 04_quarterly_churn_rate.png, 05_tier_churn_rate.png, 06_tier_industry_heatmap.png, 07_pro_retail_break.png, 08_waterfall.png, 09_pro_retail_by_cohort.png, 11_arr_scenarios.png - all referenced from deck.md slides."
+    },
+    {
+      "text": "Tone is non-technical and appropriate for a board audience",
+      "passed": true,
+      "evidence": "Deck uses board-facing language throughout - title page states 'Prepared for the Board of Directors', headline slide labels 'Headline / Evidence / Ask', explanations like 'Intuition said cheap plans = first to leave. Data says the opposite', and explicit distinction between 'What we know' and 'What we don't know'. No code, formulas, or statistical jargon surface to the reader."
+    }
+  ],
+  "summary": {
+    "passed": 10,
+    "failed": 0,
+    "total": 10,
+    "pass_rate": 1.0
+  },
+  "timing": {
+    "executor_duration_seconds": 862.2,
+    "total_tokens": 123901
+  },
+  "claims": [
+    {
+      "claim": "Q2-2026 churn rate is 6.95% with 92 churned customers and $837,600 ARR walked.",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Re-computed from customer_churn.csv: at-risk=1324, churned=92, rate=6.95%, ARR=$837,600 - exact match with deck slides 2-4 and finding F1."
+    },
+    {
+      "claim": "Pro-Retail Q2-2026 churn rate is 21.6% (21 of 97 at-risk) vs. 1.0% (1 of 98) in Q1-2026 - a 21x step.",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Re-computed from customer_churn.csv: Pro-Retail Q2-26 at_risk=97, churned=21, rate=21.65%; Q1-26 at_risk=98, churned=1, rate=1.02% - exact match with deck slides 6-7 and findings F3, F6."
+    },
+    {
+      "claim": "Pro tier Q2-26 rate is 10.58% (49 of 463), Starter 5.34% (35 of 655), Enterprise 3.88% (8 of 206).",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Re-computed from customer_churn.csv: Pro 49/463=10.58%, Starter 35/655=5.34%, Enterprise 8/206=3.88% - exact match with deck slide 5 and finding F2."
+    }
+  ],
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "All 10 assertions pass cleanly. The deliverable is a complete, numerically accurate, board-ready Marp deck. Every headline number spot-checked against the source CSV (Q2-26 total rate 6.95%, Pro-Retail 21.6%, Pro-tier 10.58%, Starter 5.34%, Enterprise 3.88%) matches to two decimal places. The storyboard explicitly follows Context-Tension-Resolution, recommendations carry named owners and confidence grades (High/High/Medium), validation.md re-derives every finding by an independent method, and a Simpson's-paradox check is performed. Action-oriented titles are used throughout (7+ of 15 slides state conclusions rather than describing categories). This is a model-quality run of the ai-analyst-pipeline skill."
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "findings": [
+    {
+      "id": "F1",
+      "claim": "Aggregate visitor arrivals look 'back to normal': 2025 is 10.01M vs 2024's 10.17M, a 1.6% YoY dip, which supports a surface narrative of recovery.",
+      "type": "profile",
+      "evidence": "Computed from tourism_monthly.csv, groupby year.",
+      "supporting_numbers": {
+        "arrivals_2024": 10174681,
+        "arrivals_2025": 10012705,
+        "total_yoy_pct": -1.59,
+        "total_abs_delta": -161976
+      },
+      "hypothesis_tested": "H1",
+      "confidence": "high",
+      "script": "notebooks/01_yoy_by_dimension.py"
+    },
+    {
+      "id": "F2",
+      "claim": "The flat aggregate is a Simpson's Paradox: Maui grew +3.75% YoY while Oahu fell -4.55%, with Hawaii and Kauai essentially flat. Oahu alone lost 240k visitors vs 2024.",
+      "type": "segmentation",
+      "evidence": "Computed from tourism_monthly.csv, groupby year x island.",
+      "supporting_numbers": {
+        "maui_yoy_pct": 3.75,
+        "oahu_yoy_pct": -4.55,
+        "hawaii_yoy_pct": -0.65,
+        "kauai_yoy_pct": 0.24,
+        "oahu_abs_delta": -239833,
+        "maui_abs_delta": 84964
+      },
+      "hypothesis_tested": "H1, H2",
+      "confidence": "high",
+      "script": "notebooks/01_yoy_by_dimension.py, notebooks/04_simpsons_paradox_check.py"
+    },
+    {
+      "id": "F3",
+      "claim": "Oahu is the only source of net decline. It accounts for 148% of the total YoY drop (i.e., the other three islands combined offset ~78k visitors of gains). Without Oahu's issue, the portfolio would be in modest net growth.",
+      "type": "segmentation",
+      "evidence": "Sum of per-island deltas compared to total delta.",
+      "supporting_numbers": {
+        "oahu_delta": -239833,
+        "other_three_combined_delta": 77857,
+        "total_delta": -161976,
+        "oahu_share_of_total_decline_pct": 148.1
+      },
+      "hypothesis_tested": "H2",
+      "confidence": "high",
+      "script": "notebooks/01_yoy_by_dimension.py"
+    },
+    {
+      "id": "F4",
+      "claim": "Oahu's decline is accelerating within 2025, not stabilizing. Q1 ran -2 to -3% YoY; Q4 ran -7 to -9% YoY. October 2025 was -9.4%, the worst month in the dataset.",
+      "type": "trend",
+      "evidence": "Monthly Oahu YoY deltas, month-of-year 2025 vs 2024.",
+      "supporting_numbers": {
+        "oahu_h1_yoy_pct": -2.72,
+        "oahu_h2_yoy_pct": -6.31,
+        "oahu_oct_yoy_pct": -9.43,
+        "oahu_nov_yoy_pct": -7.79,
+        "oahu_dec_yoy_pct": -6.75
+      },
+      "hypothesis_tested": "H5",
+      "confidence": "high",
+      "script": "notebooks/03_oahu_monthly_trend.py"
+    },
+    {
+      "id": "F5",
+      "claim": "Oahu's decline concentrates in the hotel segment, which lost 160k visitors (67% of Oahu's total decline). Hotel-luxury alone lost 73k visitors (31% of Oahu's decline) at -10.1% YoY; hotel-mid_market lost 74k (31% of Oahu's decline) at -4.6% YoY.",
+      "type": "root_cause_drill",
+      "evidence": "Oahu subset, groupby accommodation_type x tier.",
+      "supporting_numbers": {
+        "oahu_hotel_delta": -160042,
+        "oahu_hotel_luxury_delta": -73388,
+        "oahu_hotel_luxury_pct": -10.12,
+        "oahu_hotel_mid_delta": -74012,
+        "oahu_hotel_mid_pct": -4.63
+      },
+      "hypothesis_tested": "H3",
+      "confidence": "high",
+      "script": "notebooks/02_oahu_root_cause.py"
+    },
+    {
+      "id": "F6",
+      "claim": "Within Oahu hotel-luxury, US_mainland is the largest absolute loss (-42.5k, 58% of the hotel-luxury decline) but Japanese visitors dropped the steepest (-12.6% YoY, -16.5k). This isn't an Oahu-specific Japan issue generally; it's specifically Japan's taste for Oahu luxury hotels.",
+      "type": "root_cause_drill",
+      "evidence": "Oahu hotel-luxury subset, groupby origin_market. Cross-checked against Japan-hotel-luxury across all islands: Oahu's -16.5k dominates a -15.9k total (other islands slightly positive).",
+      "supporting_numbers": {
+        "oahu_hotel_lux_us_delta": -42515,
+        "oahu_hotel_lux_us_pct": -9.77,
+        "oahu_hotel_lux_japan_delta": -16506,
+        "oahu_hotel_lux_japan_pct": -12.59,
+        "japan_hotel_luxury_all_islands_delta": -15935
+      },
+      "hypothesis_tested": "H4",
+      "confidence": "high",
+      "script": "notebooks/02_oahu_root_cause.py"
+    },
+    {
+      "id": "F7",
+      "claim": "A substitution effect is partially visible: Maui gained ~51k US_mainland visitors while Oahu lost ~157k US_mainland visitors. Maui's hotel-luxury grew +2.4% YoY across all origins. This looks like mainland travelers choosing Maui over Oahu - but it is not a net wash (Oahu's loss exceeds Maui's gain by roughly 3x).",
+      "type": "root_cause_drill",
+      "evidence": "US_mainland by island: Maui +51k, Oahu -157k. Maui hotel-luxury +7.3k, Oahu hotel-luxury -73.4k.",
+      "supporting_numbers": {
+        "maui_us_mainland_delta": 50688,
+        "oahu_us_mainland_delta": -157463,
+        "net_us_mainland_delta": -113777,
+        "maui_gain_vs_oahu_loss_ratio": 0.32
+      },
+      "hypothesis_tested": "H3, H4",
+      "confidence": "medium",
+      "script": "notebooks/01_yoy_by_dimension.py"
+    },
+    {
+      "id": "F8",
+      "claim": "Oahu's decline is concentrated - 77.7% of Oahu's total YoY loss comes from just 10 (accommodation x tier x origin) cells out of 45 possible cells, and 62% from the top 5. This means interventions can target a narrow set of segments, not the whole island's tourism stack.",
+      "type": "opportunity_sizing",
+      "evidence": "Ranked Oahu cells by abs_delta; cumulative share of decline.",
+      "supporting_numbers": {
+        "top_5_share_pct": 62.0,
+        "top_10_share_pct": 77.7,
+        "total_cells": 45
+      },
+      "hypothesis_tested": "H3",
+      "confidence": "high",
+      "script": "notebooks/02_oahu_root_cause.py"
+    },
+    {
+      "id": "F9",
+      "claim": "The decline is structural, not seasonal. H1 2025 Oahu ran -2.7% YoY; H2 2025 ran -6.3% YoY. Peak months (June/July/August, December) are still the peaks - the shape is intact, but the level is depressed, and the gap is widening in Q4.",
+      "type": "trend",
+      "evidence": "H1/H2 YoY comparisons by island; month-over-month pattern shape preserved but trend drops.",
+      "supporting_numbers": {
+        "oahu_h1_yoy_pct": -2.72,
+        "oahu_h2_yoy_pct": -6.31,
+        "maui_h2_yoy_pct": 7.01
+      },
+      "hypothesis_tested": "H5",
+      "confidence": "high",
+      "script": "notebooks/03_oahu_monthly_trend.py"
+    }
+  ],
+  "hypothesis_results": {
+    "H1": "supported - Simpson's Paradox confirmed; aggregate -1.6% hides -4.6% Oahu and +3.8% Maui",
+    "H2": "supported - Oahu is the sole net-decline island; other three are flat or positive",
+    "H3": "supported - Oahu decline concentrates in 10 of 45 cells (77.7%); hotel tier, luxury and mid-market drive most",
+    "H4": "partially supported - origin-mix is uneven (Japan luxury-hotel is a notable outlier on Oahu specifically) but US_mainland is the dominant absolute driver due to volume",
+    "H5": "supported - seasonal shape intact; decline is level not shape; H2 is deteriorating faster than H1"
+  }
+}

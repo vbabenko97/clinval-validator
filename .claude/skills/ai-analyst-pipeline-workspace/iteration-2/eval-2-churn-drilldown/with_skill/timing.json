@@ -1,0 +1,7 @@
+{
+  "total_tokens": 123901,
+  "duration_ms": 862211,
+  "total_duration_seconds": 862.2,
+  "tool_uses": 56,
+  "status": "completed"
+}

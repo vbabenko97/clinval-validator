@@ -3,9 +3,6 @@
 Pure Python compute layer. No network access: this module and the package it
 lives in must run fully offline. Each public function computes one piece of the
 report JSON contract that ``reporter`` consumes, and none of them call an LLM.
-
-Phase 1 fills in the bodies; every check is a stub (``NotImplementedError``)
-until then.
 """
 
 from __future__ import annotations
@@ -82,8 +79,9 @@ class ReportPayload(TypedDict):
 def check_patient_leakage(df: pd.DataFrame) -> LeakageResult:
     """Detect ``patient_id`` overlap between the train and test splits.
 
-    Returns the count of patient IDs that appear in more than one split and the
-    corresponding leakage rate.
+    Returns the count of patient IDs present in **both** the train and test
+    splits (a ``val`` split also exists but is not a train/test leak) and the
+    leakage rate: that count over the distinct patients across train and test.
     """
     train = set(df.loc[df["split"] == "train", "patient_id"])
     test = set(df.loc[df["split"] == "test", "patient_id"])

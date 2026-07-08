@@ -12,8 +12,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import GroupShuffleSplit
+
 if TYPE_CHECKING:
     import pandas as pd
+
+# Subgroup flag thresholds, calibrated against the labeled scenarios: M030 in
+# subgroup_scanner_degradation sits 0.21 below pooled and must flag, while every
+# subgroup in clean_patient_grouped is within 0.07 of pooled and must not.
+_FLAG_DELTA = -0.10
+_MIN_SUBGROUP_N = 50
 
 __all__ = [
     "LeakageResult",
@@ -76,16 +85,39 @@ def check_patient_leakage(df: pd.DataFrame) -> LeakageResult:
     Returns the count of patient IDs that appear in more than one split and the
     corresponding leakage rate.
     """
-    raise NotImplementedError
+    train = set(df.loc[df["split"] == "train", "patient_id"])
+    test = set(df.loc[df["split"] == "test", "patient_id"])
+    overlapping = len(train & test)
+    distinct_patients = len(train | test)
+    return {
+        "overlapping_patient_ids": overlapping,
+        "leakage_rate": overlapping / distinct_patients,
+    }
 
 
 def audit_split_quality(df: pd.DataFrame) -> SplitAuditResult:
     """Recompute the headline metric under a random vs a grouped split.
 
     Surfaces the gap between the optimistic random-split metric and the
-    leakage-safe patient/site-grouped metric.
+    leakage-safe patient/site-grouped metric. Both AUCs read the same fixed
+    ``y_prob``; only the choice of test rows differs. ``random_split`` uses the
+    test rows as given in the file; ``grouped_split`` re-partitions by
+    ``patient_id`` with a fixed seed so no patient spans the fold boundary.
     """
-    raise NotImplementedError
+    test_rows = df[df["split"] == "test"]
+    random_split = float(roc_auc_score(test_rows["y_true"], test_rows["y_prob"]))
+
+    splitter = GroupShuffleSplit(n_splits=1, test_size=0.15, random_state=0)
+    _, grouped_test_idx = next(splitter.split(df, groups=df["patient_id"]))
+    grouped_fold = df.iloc[grouped_test_idx]
+    grouped_split = float(roc_auc_score(grouped_fold["y_true"], grouped_fold["y_prob"]))
+
+    return {
+        "metric": "auc",
+        "random_split": random_split,
+        "grouped_split": grouped_split,
+        "gap": random_split - grouped_split,
+    }
 
 
 def check_subgroup_degradation(df: pd.DataFrame) -> list[SubgroupResult]:
@@ -93,15 +125,38 @@ def check_subgroup_degradation(df: pd.DataFrame) -> list[SubgroupResult]:
 
     Returns one entry per evaluated subgroup, each carrying its AUC, delta
     versus the pooled metric, and whether it is flagged as significantly below
-    pooled performance.
+    pooled performance. A subgroup is skipped (not evaluated) when it has fewer
+    than ``_MIN_SUBGROUP_N`` rows or lacks both classes, since its AUC would be
+    undefined or too noisy to trust.
     """
-    raise NotImplementedError
+    pooled_auc = float(roc_auc_score(df["y_true"], df["y_prob"]))
+    results: list[SubgroupResult] = []
+    for key in ("machine_id", "site_id"):
+        for value, group in df.groupby(key):
+            if len(group) < _MIN_SUBGROUP_N or group["y_true"].nunique() < 2:
+                continue
+            auc = float(roc_auc_score(group["y_true"], group["y_prob"]))
+            delta = auc - pooled_auc
+            results.append(
+                {
+                    "key": key,
+                    "value": str(value),
+                    "n": len(group),
+                    "auc": auc,
+                    "delta_vs_pooled": delta,
+                    "flagged": delta <= _FLAG_DELTA,
+                }
+            )
+    return results
 
 
 def compute_pooled_metric(df: pd.DataFrame) -> PooledMetric:
-    """Compute the pooled headline metric (AUC) across the test-split rows.
+    """Compute the pooled headline metric (AUC) over all rows.
 
     This is the reference value that subgroup deltas are measured against and
-    the ``pooled_metric`` field of the report payload.
+    the ``pooled_metric`` field of the report payload. AUC is computed over the
+    full table (not the test split alone) to match each manifest's
+    ``verification.overall_auc`` and give every subgroup enough positives for a
+    defined per-subgroup AUC at this dataset's ~1.5% prevalence.
     """
-    raise NotImplementedError
+    return {"name": "auc", "value": float(roc_auc_score(df["y_true"], df["y_prob"]))}

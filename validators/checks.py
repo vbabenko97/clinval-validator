@@ -81,15 +81,15 @@ def check_patient_leakage(df: pd.DataFrame) -> LeakageResult:
 
     Returns the count of patient IDs present in **both** the train and test
     splits (a ``val`` split also exists but is not a train/test leak) and the
-    leakage rate: that count over the distinct patients across train and test.
+    leakage rate: the fraction of distinct test patients that also appear in
+    train — how much of the test evaluation is contaminated.
     """
     train = set(df.loc[df["split"] == "train", "patient_id"])
     test = set(df.loc[df["split"] == "test", "patient_id"])
     overlapping = len(train & test)
-    distinct_patients = len(train | test)
     return {
         "overlapping_patient_ids": overlapping,
-        "leakage_rate": overlapping / distinct_patients,
+        "leakage_rate": overlapping / len(test),
     }
 
 

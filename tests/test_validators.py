@@ -29,11 +29,10 @@ def test_detects_train_test_patient_overlap(demo_csv_path: Path) -> None:
     df = pd.read_csv(demo_csv_path)
     result = check_patient_leakage(df)
     assert result["overlapping_patient_ids"] == 940
-    # Pinned definition: overlap / distinct patients in (train ∪ test) = 940 / 1999.
-    train = set(df.loc[df["split"] == "train", "patient_id"])
+    # leakage_rate = fraction of distinct test patients also seen in train = 940 / 959.
     test = set(df.loc[df["split"] == "test", "patient_id"])
-    assert result["leakage_rate"] == pytest.approx(940 / len(train | test))
-    assert result["leakage_rate"] == pytest.approx(0.4702, abs=1e-4)
+    assert result["leakage_rate"] == pytest.approx(940 / len(test))
+    assert result["leakage_rate"] == pytest.approx(0.9802, abs=1e-4)
 
 
 def test_leakage_zero_on_clean_grouped_split() -> None:

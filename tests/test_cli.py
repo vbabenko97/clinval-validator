@@ -40,3 +40,25 @@ def test_cli_smoke_end_to_end(monkeypatch, capsys) -> None:
     assert exit_code == 0
     out = capsys.readouterr().out.strip()
     assert "REPORT overlap=940" in out
+
+
+def test_cli_defaults_to_risk_mode(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "render_report", lambda payload: "RISK-DEFAULT")
+    monkeypatch.setattr(cli, "render_reviewer_critique", lambda payload: "CRITIQUE-UNUSED")
+    exit_code = cli.main(["--predictions", str(DEMO_CSV)])
+    assert exit_code == 0
+    assert capsys.readouterr().out.strip() == "RISK-DEFAULT"
+
+
+def test_cli_critique_mode_uses_reviewer_critique(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "render_report", lambda payload: "RISK-UNUSED")
+    monkeypatch.setattr(
+        cli,
+        "render_reviewer_critique",
+        lambda payload: f"CRITIQUE overlap={payload['leakage']['overlapping_patient_ids']}",
+    )
+    exit_code = cli.main(["--predictions", str(DEMO_CSV), "--mode", "critique"])
+    assert exit_code == 0
+    out = capsys.readouterr().out.strip()
+    assert "CRITIQUE overlap=940" in out
+    assert "RISK-UNUSED" not in out

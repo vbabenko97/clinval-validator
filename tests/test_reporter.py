@@ -6,7 +6,7 @@ import json
 from types import SimpleNamespace
 
 import reporter
-from reporter import MODEL, render_report
+from reporter import MODEL, render_report, render_reviewer_critique
 
 SAMPLE_PAYLOAD = {
     "leakage": {"overlapping_patient_ids": 940, "leakage_rate": 0.4702},
@@ -48,3 +48,37 @@ def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
     # The operative reviewer prompt is sent, not the file's Markdown doc header.
     assert "senior clinical-AI validation reviewer" in captured["system"]
     assert "# Reporter system prompt" not in captured["system"]
+
+
+def test_render_reviewer_critique_sends_payload_json_to_opus(monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    captured: dict = {}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(text="Reviewer verdict: reject")])
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            captured["api_key"] = api_key
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+
+    critique_text = render_reviewer_critique(SAMPLE_PAYLOAD)
+
+    assert critique_text == "Reviewer verdict: reject"
+    assert captured["api_key"] == "test-key"
+    assert captured["model"] == MODEL == "claude-opus-4-8"
+    assert captured["max_tokens"] == 1024
+
+    user_message = captured["messages"][0]
+    assert user_message["role"] == "user"
+    assert json.loads(user_message["content"]) == SAMPLE_PAYLOAD
+
+    # The critique step loads its own prompt, distinct from the risk reporter's,
+    # and sends the operative prompt rather than the file's Markdown doc header.
+    assert "Methods paragraph" in captured["system"]
+    assert "senior clinical-AI validation reviewer" not in captured["system"]
+    assert "# Reviewer critique system prompt" not in captured["system"]

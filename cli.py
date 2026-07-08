@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from reporter import render_report
+from reporter import render_report, render_reviewer_critique
 from clinval_validators import (
     ReportPayload,
     audit_split_quality,
@@ -34,6 +34,13 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         type=Path,
         required=True,
         help="Path to the predictions CSV (see README for the expected schema).",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("risk", "critique"),
+        default="risk",
+        help="risk: GREEN/YELLOW/RED risk report (default). "
+        "critique: reviewer critique + corrected Methods paragraph.",
     )
     return parser.parse_args(argv)
 
@@ -57,8 +64,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     df = _load_predictions(args.predictions)
     payload = _assemble_payload(df)
-    report = render_report(payload)
-    print(report)
+    render = render_reviewer_critique if args.mode == "critique" else render_report
+    print(render(payload))
     return 0
 
 

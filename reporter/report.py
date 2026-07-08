@@ -1,11 +1,11 @@
 """LLM reporting step: turn the validators' JSON payload into prose.
 
 This is the only module in the project that touches the network. It sends the
-deterministic report payload to Claude (``claude-opus-4-8``) under the reviewer
-system prompt and returns the rendered Validation Risk Report. It never computes
-a metric — every number in the report comes from the payload.
-
-Phase 1 fills in the Anthropic call; :func:`render_report` is a stub until then.
+deterministic report payload to Claude (``claude-opus-4-8``) under one of two
+system prompts and returns the rendered text: :func:`render_report` produces the
+GREEN/YELLOW/RED Validation Risk Report, :func:`render_reviewer_critique`
+produces a journal-reviewer critique with a corrected Methods paragraph. Neither
+computes a metric — every number in the output comes from the payload.
 """
 
 from __future__ import annotations
@@ -22,39 +22,53 @@ if TYPE_CHECKING:
 
 MODEL = "claude-opus-4-8"
 API_KEY_ENV = "ANTHROPIC_API_KEY"
-SYSTEM_PROMPT_PATH = (
-    Path(__file__).resolve().parent.parent
-    / "prompts"
-    / "opus-4-8"
-    / "reporter_system_prompt.md"
-)
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "opus-4-8"
+SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "reporter_system_prompt.md"
+CRITIQUE_SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "reviewer_critique_system_prompt.md"
 
-__all__ = ["render_report", "MODEL", "API_KEY_ENV", "SYSTEM_PROMPT_PATH"]
+__all__ = [
+    "render_report",
+    "render_reviewer_critique",
+    "MODEL",
+    "API_KEY_ENV",
+    "SYSTEM_PROMPT_PATH",
+    "CRITIQUE_SYSTEM_PROMPT_PATH",
+]
 
 
-def _load_system_prompt() -> str:
-    """Read the operative reviewer system prompt from disk.
+def _load_system_prompt(path: Path) -> str:
+    """Read the operative system prompt from disk.
 
     The file opens with a short Markdown doc header; the operative prompt is the
     content after the first ``---`` separator. Only that part is returned.
     """
-    text = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8")
     return text.split("---", 1)[1].strip()
 
 
-def render_report(payload: ReportPayload) -> str:
-    """Render the Validation Risk Report from the deterministic payload.
+def _render(payload: ReportPayload, system_prompt_path: Path) -> str:
+    """Send the deterministic payload to ``claude-opus-4-8`` under one prompt.
 
     Reads the Anthropic API key from the ``ANTHROPIC_API_KEY`` environment
-    variable, loads the system prompt via :func:`_load_system_prompt`, sends the
-    payload as JSON to ``claude-opus-4-8``, and returns the report text. The key
-    is never hard-coded.
+    variable, loads the operative system prompt from ``system_prompt_path``, sends
+    the payload as JSON, and returns the model's text. The key is never
+    hard-coded, and no number is computed here — every figure comes from the JSON.
     """
     client = Anthropic(api_key=os.environ[API_KEY_ENV])
     message = client.messages.create(
         model=MODEL,
         max_tokens=1024,
-        system=_load_system_prompt(),
+        system=_load_system_prompt(system_prompt_path),
         messages=[{"role": "user", "content": json.dumps(payload)}],
     )
     return message.content[0].text
+
+
+def render_report(payload: ReportPayload) -> str:
+    """Render the GREEN/YELLOW/RED Validation Risk Report from the payload."""
+    return _render(payload, SYSTEM_PROMPT_PATH)
+
+
+def render_reviewer_critique(payload: ReportPayload) -> str:
+    """Render a journal-reviewer critique plus a corrected Methods paragraph."""
+    return _render(payload, CRITIQUE_SYSTEM_PROMPT_PATH)

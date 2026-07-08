@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clinval-validator"
+version = "0.1.0"
+description = "Validation-risk checks for medical-imaging ML models: patient leakage, split quality, subgroup degradation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "vbabenko97" }]
+dependencies = [
+    "pandas",
+    "scikit-learn",
+    "anthropic",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+clinval-validate = "cli:main"
+
+[tool.setuptools]
+packages = ["validators", "reporter"]
+py-modules = ["cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

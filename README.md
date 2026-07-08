@@ -17,9 +17,12 @@ turn that structured JSON into prose in `reporter/` — it never computes a numb
 > Screening Mammography schema. No PHI, no real patient data, no RSNA images in
 > this repo. Not medical advice.
 
-**Status:** scaffold stage. Package skeleton, the report JSON contract, and the
-CLI wiring are in place; the Phase-1 checks and the Claude call are stubs
-(`raise NotImplementedError`) pending implementation. See [TASKS.md](TASKS.md).
+**Status:** Phase 1 complete. The four deterministic checks (patient leakage,
+split-quality audit, subgroup degradation, pooled AUC) and the Claude reporter
+are implemented and verified against the labeled scenario manifests — `pytest` is
+green, and `clinval-validate` runs end-to-end (a real `ANTHROPIC_API_KEY` is
+needed only for the report step). See [TASKS.md](TASKS.md) and
+[demo/run_demo.sh](demo/run_demo.sh).
 
 ## MVP scope (Phase 1)
 
@@ -67,13 +70,17 @@ python -m pytest
 
 ## Demo narrative (3-minute video)
 
-1. Run the validator on a random-split table — the headline AUC looks publishable.
-2. The split-quality audit re-splits by `patient_id`: the metric collapses and
-   the leakage check reports the shared patients.
-3. Claude reads the deterministic JSON and explains, in reviewer language, why
-   the original claim is unsafe and what may still be claimed.
+1. Run the validator on `weak_random_split_leakage` — the headline pooled AUC
+   (≈ 0.84) looks publishable.
+2. The leakage check finds **940 patients shared across train and test** and
+   marks the random split as not leakage-safe; the split-quality audit
+   re-evaluates the same predictions on a patient-grouped fold.
+3. Claude reads the deterministic JSON and explains, in reviewer language, why an
+   AUC measured under patient overlap does not reflect deployment, and what may
+   still be claimed.
 4. Claude names the single next validation step (a leakage-safe grouped
-   re-evaluation).
+   re-evaluation). For contrast, `optimistic_site_shortcut` shows the same
+   failure at its most dramatic: AUC 0.9647 under a leaking split.
 
 ## License
 

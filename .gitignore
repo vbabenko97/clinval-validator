@@ -22,5 +22,13 @@ env/
 # Generator default output (fixtures live in claude-science-artifcats/scenarios/ and ARE committed)
 /predictions.csv
 
+# Real RSNA-SMBC data — the license bans redistribution "in any form". Never commit
+# the raw table or any predictions.csv derived from it. Local-only; the repo stays synthetic.
+/data/rsna/
+train.csv
+test.csv
+predictions_rsna*.csv
+*.real.csv
+
 # OS
 .DS_Store

@@ -17,11 +17,14 @@ turn that structured JSON into prose in `reporter/` — it never computes a numb
 > Screening Mammography schema. No PHI, no real patient data, no RSNA images in
 > this repo. Not medical advice.
 
-**Status:** Phase 1 complete. The four deterministic checks (patient leakage,
-split-quality audit, subgroup degradation, pooled AUC) and the Claude reporter
-are implemented and verified against the labeled scenario manifests — `pytest` is
-green, and `clinval-validate` runs end-to-end (a real `ANTHROPIC_API_KEY` is
-needed only for the report step). See [TASKS.md](TASKS.md) and
+**Status:** Phase 1 complete, plus the first Phase-2 feature. The four
+deterministic checks (patient leakage, split-quality audit, subgroup
+degradation, pooled AUC) and the Claude reporter are implemented and verified
+against the labeled scenario manifests — `pytest` is green, and
+`clinval-validate` runs end-to-end (a real `ANTHROPIC_API_KEY` is needed only for
+the report step). A reviewer-critique mode (`--mode critique`) adds a
+journal-reviewer critique and a corrected, leakage-safe Methods paragraph over
+the same deterministic JSON. See [TASKS.md](TASKS.md) and
 [demo/run_demo.sh](demo/run_demo.sh).
 
 ## MVP scope (Phase 1)
@@ -61,12 +64,51 @@ python -m pip install -e .
 # 2. Set your personal Anthropic API key (never commit it).
 export ANTHROPIC_API_KEY=sk-ant-...
 
-# 3. Validate a labeled scenario and print the risk report.
+# 3. Validate a labeled scenario and print the GREEN / YELLOW / RED risk report.
 clinval-validate --predictions claude-science-artifacts/scenarios/weak_random_split_leakage.csv
+
+# Or ask for a journal-reviewer critique plus a corrected, leakage-safe Methods paragraph.
+clinval-validate --predictions claude-science-artifacts/scenarios/weak_random_split_leakage.csv --mode critique
 
 # Run the test suite.
 python -m pytest
 ```
+
+## Sample output
+
+Running `--mode risk` on `weak_random_split_leakage`, the deterministic layer
+computes this payload (this is what Python hands to Claude — no metric is ever
+computed by the model):
+
+```json
+{
+  "leakage": {"overlapping_patient_ids": 940, "leakage_rate": 0.9802},
+  "split_audit": {"metric": "auc", "random_split": 0.8273, "grouped_split": 0.8994, "gap": -0.0721},
+  "subgroups": [{"key": "site_id", "value": "S03", "n": 2125, "auc": 0.7896, "delta_vs_pooled": -0.0528, "flagged": false}],
+  "pooled_metric": {"name": "auc", "value": 0.8425}
+}
+```
+
+Claude renders that into a reviewer-style report. An illustrative excerpt (the
+wording is model-generated and varies run to run; the numbers are fixed by the
+payload above):
+
+```
+1. Overall risk — RED. 940 patient IDs appear in both train and test, so the
+   reported metrics do not reflect held-out performance.
+
+2. What the data shows — The leakage check finds 940 shared patients (98.0% of
+   the test patients also appear in training). Pooled AUC is 0.84, but that
+   figure is measured across a contaminated split. No machine_id or site_id
+   subgroup falls more than 0.10 below pooled.
+
+5. Next validation step — Re-evaluate the same predictions on a patient-grouped
+   split so no patient spans the train/test boundary, and report the grouped AUC
+   as the headline number.
+```
+
+The full 3-minute demo script — synthetic opener, real RSNA cohort, clean
+control, and the `--mode critique` close — is in [docs/DEMO.md](docs/DEMO.md).
 
 ## Demo narrative (3-minute video)
 

@@ -49,10 +49,13 @@ clinval-validate --predictions predictions_rsna_random.csv
 **Say:** This runs on the actual RSNA Screening Mammography cohort, mapped into
 the predictions schema by a local adapter. The RSNA data and any CSV derived from
 it are gitignored and never committed — the license prohibits redistribution, so
-the repo stays synthetic-only. On this real screening dataset — 54,706 rows,
-7,524 test-set patients — a naive random split leaks 7,511 of those patients, 99.8
-percent, back into training. That is not a misconfiguration; it is what a random
-split does when patient IDs are not grouped before splitting.
+the repo stays synthetic-only. Each patient here contributes about four to five
+mammogram images — two sides, two views, plus repeats — so a naive row-level
+random split scatters one patient's images across train and test. Across 54,706
+rows and 7,524 test-set patients, that split leaves 7,511 of them — 99.8 percent —
+with at least one image also sitting in training. Nothing is wrong with RSNA
+itself; the mistake is splitting by image instead of by patient, and that is
+exactly the methodological error this tool exists to catch.
 
 ---
 

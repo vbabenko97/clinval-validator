@@ -25,7 +25,7 @@ What exists:
   - `leakage_generator.py` — generates one RSNA-like `predictions.csv` with injected, manifest-verified flaws.
   - `make_scenarios.py` — builds the full labeled suite in `scenarios/`.
   - `scenarios/*.csv` + `*.manifest.json` + `_scenario_summary.csv` — 6 ground-truth-labeled scenarios.
-- [prompts/](prompts/) — model-specific project briefs (opus-4-8, gpt-5-5) used to bootstrap the build. Historical artifacts, not runtime code.
+- [prompts/](prompts/) — the two **runtime** system prompts the reporter loads (`reporter_system_prompt.md`, `reviewer_critique_system_prompt.md`); see [prompts/README.md](prompts/README.md). Load-bearing, not historical.
 - [AGENTS.md](AGENTS.md) — Codex/GPT behavioral rules (also govern Claude).
 
 To build (MVP — see Scope):

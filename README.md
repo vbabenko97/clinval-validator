@@ -72,6 +72,10 @@ clinval-validate --predictions claude-science-artifacts/scenarios/weak_random_sp
 
 # Run the test suite.
 python -m pytest
+
+# Optional: launch the browser demo UI (pick a scenario, see the flags, then
+# render the risk report or reviewer critique with Claude).
+python -m pip install -e '.[demo]' && streamlit run app.py
 ```
 
 ## Sample output

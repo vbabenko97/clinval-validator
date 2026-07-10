@@ -16,8 +16,9 @@ env/
 .env
 .env.*
 
-# Machine-local Claude/Codex overrides (absolute paths, personal settings)
-.claude/settings.local.json
+# Local Claude/Codex tooling (vendored skills/agents/config — not hackathon work)
+.claude/
+.codex/
 
 # Generator default output (fixtures live in claude-science-artifcats/scenarios/ and ARE committed)
 /predictions.csv

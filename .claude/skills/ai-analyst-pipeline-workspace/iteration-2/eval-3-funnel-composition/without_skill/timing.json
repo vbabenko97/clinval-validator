@@ -1,8 +1,0 @@
-{
-  "total_tokens": 109272,
-  "duration_ms": 1006826,
-  "total_duration_seconds": 1006.8,
-  "tool_uses": 107,
-  "status": "completed",
-  "notes": "Subagent reported intermittent Read/Write/Bash denials despite the expanded allow list; worked around via python3 -c with pickle staging. Full deliverable produced."
-}

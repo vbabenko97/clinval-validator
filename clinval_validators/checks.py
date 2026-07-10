@@ -94,13 +94,16 @@ def check_patient_leakage(df: pd.DataFrame) -> LeakageResult:
 
 
 def audit_split_quality(df: pd.DataFrame) -> SplitAuditResult:
-    """Recompute the headline metric under a random vs a grouped split.
+    """Recompute the headline metric under the file's split vs a grouped split.
 
-    Surfaces the gap between the optimistic random-split metric and the
-    leakage-safe patient/site-grouped metric. Both AUCs read the same fixed
-    ``y_prob``; only the choice of test rows differs. ``random_split`` uses the
-    test rows as given in the file; ``grouped_split`` re-partitions by
-    ``patient_id`` with a fixed seed so no patient spans the fold boundary.
+    Both AUCs read the same fixed ``y_prob`` on two different test subsets, so
+    this measures how sensitive the headline metric is to the choice of split —
+    it is a diagnostic, not a retrained proof of split-induced optimism.
+    ``random_split`` uses the test rows as given in the file; ``grouped_split``
+    re-partitions by ``patient_id`` with a fixed seed so no patient spans the
+    fold boundary. The rigorous leakage signal is :func:`check_patient_leakage`;
+    ``gap`` can be small or even negative when the leak is structural patient
+    overlap rather than an inflated ``y_prob``.
     """
     test_rows = df[df["split"] == "test"]
     random_split = float(roc_auc_score(test_rows["y_true"], test_rows["y_prob"]))

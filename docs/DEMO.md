@@ -33,33 +33,48 @@ inflate the estimate." That is excellent science — the tool refuses a convenie
 narrative — but it flatly contradicts an opener that claims the number was inflated.
 Save it for the write-up, not the 3-minute cut.
 
+## Delivery notes
+
+- **Two numbers, not three.** The arc is 0.9875 → 0.9521 — the same predictions on
+  two evaluation populations. Pooled AUC (0.9647) is a *different* quantity, computed
+  over all rows; it stays in the JSON and never enters the narration. Three AUCs in
+  the ear is a number salad.
+- **Never say "corrected AUC", "true AUC", or "honest performance"** for 0.9521. The
+  model was not retrained. Say: *the same predictions, scored where no patient crosses
+  the boundary.* Overclaiming here, in a talk about overclaiming, is an own goal.
+- Speak the numbers out: "zero point nine eight seven five", "fifty-four thousand
+  seven hundred and six". Say **patient-disjoint** slowly — it's the load-bearing term.
+- It's **Claude**, not "cloud".
+- Short sentences. Let the red-to-green banner flip land before you talk over it.
+
 ---
 
-## 0:00–0:15 — Intro
+## 0:00–0:12 — The hook
 
-**Say:** A model comes back with an AUC that looks publishable, and the question
-nobody asks is whether that number survives contact with a correct evaluation.
-This tool answers exactly that. Every flag you're about to see is computed by
-deterministic Python — Claude never computes a number, it only explains the risk.
+**Say:** A model returns an AUC that looks publishable. The question is whether the
+evaluation deserves belief. Here, Python computes the checks deterministically.
+Claude explains the risk.
 
 ---
 
-## Beat 1 — 0:15–0:55 — The publishable-looking result
+## Beat 1 — 0:12–1:00 — One number, two evaluation populations
 
 **Do:** Sidebar → *Predictions source* = **Bundled scenario** → *Scenario* =
 `optimistic_site_shortcut`.
 
-**Say:** Pooled AUC is 0.9647. That would clear review in most venues. But look at
-the left panel: 990 of the 1,002 test patients — 98.8 percent — also appear in the
-training set. The split is random, not patient-grouped, so this number never
-measured held-out performance in the first place. And when the same predictions are
-re-scored on a patient-disjoint fold, the AUC falls from 0.988 to 0.952. Every one
-of those figures came from deterministic Python — the JSON underneath is exactly
-what Claude is about to receive. No language model touched them.
+**Say:** On the randomly selected test rows, this model scores zero point nine eight
+seven five. Now the leakage check. 990 of the 1,002 test patients also appear in the
+training data — 98.8 percent overlap. This was split by image, not by patient, so
+images of the same woman crossed the train-test boundary. So we take the same
+predictions — no retraining, the model is untouched — and score them only where no
+patient sits on both sides of that line. The AUC is zero point nine five two. That
+is not a corrected truth. It is a direct measurement of how much the reported result
+depends on where you draw the split. Every number on this screen was computed
+deterministically in Python. Claude receives only the JSON.
 
 ---
 
-## Beat 2 — 0:55–1:40 — Real RSNA data, at full scale
+## Beat 2 — 1:00–1:40 — Real RSNA data, at full scale
 
 **Do:** Sidebar → *Predictions source* = **Upload CSV** → upload
 `predictions_rsna_random.csv`.
@@ -72,9 +87,10 @@ images — two sides, two views — so a naive row-level random split scatters o
 patient's images across train and test. The result: 7,511 of 7,524 test patients,
 99.8 percent, also sit in training. Nothing is wrong with RSNA itself — the mistake
 is splitting by image instead of by patient, and that is exactly the error this
-tool exists to catch. One honest caveat: the pooled AUC here, 0.625, comes from a
-deliberately weak baseline built on pre-imaging metadata only. It illustrates the
-failure mode; it is not a claim about any imaging model.
+tool exists to catch. The same two tiles tell the same story: zero point six three
+six as split, zero point six one one patient-disjoint. One honest caveat — that is
+a deliberately weak baseline, built on pre-imaging metadata only. It illustrates the
+failure mode. It is not a claim about any imaging model.
 
 ---
 
@@ -83,10 +99,11 @@ failure mode; it is not a claim about any imaging model.
 **Do:** Sidebar → *Predictions source* = **Bundled scenario** → *Scenario* =
 `clean_patient_grouped`.
 
-**Say:** Same tool, same checks, but this split is grouped by patient. Watch the
-panel flip: zero leaked patients, and the red banner turns green — no leakage, no
-subgroup flags. Pooled AUC is 0.8598, lower than the leaky 0.96, and this is the
-one you can actually trust. The tool doesn't cry wolf.
+**Say:** Same tool, same checks — but this split is grouped by patient. Zero leaked
+patients, and the banner turns green. Now look at the two AUCs: zero point eight
+eight two as split, zero point eight eight five patient-disjoint. They barely move.
+The result does not depend on where you draw the boundary. That is what an
+evaluation you can believe looks like — and it's why the tool doesn't cry wolf.
 
 ---
 
@@ -96,11 +113,11 @@ one you can actually trust. The tool doesn't cry wolf.
 **Generate with Claude**.
 
 **Say:** Now Claude. It receives only the JSON on the left — every number already
-computed. It comes back with a journal-reviewer's verdict on what that 0.9647
-actually supports, and then rewrites the study's Methods paragraph so the
-evaluation is leakage-safe, on a patient-grouped split. This split screen is the
-whole thesis: Python computes, Claude explains. It cites only the figures in that
-payload and invents none.
+computed. It comes back with a journal-reviewer's verdict on what those numbers
+actually support, and then rewrites the study's Methods paragraph so the evaluation
+is leakage-safe, on a patient-grouped split. This split screen is the whole thesis:
+Python computes, Claude explains. It cites only the figures in that payload and
+invents none.
 
 ---
 

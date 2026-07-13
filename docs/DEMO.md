@@ -22,6 +22,17 @@ masked (it's a password input) — nothing secret shows on camera. Have
 `predictions_rsna_random.csv` ready in the repo root for Beat 2; it is gitignored
 and local-only.
 
+**Scenario discipline — don't improvise on camera.** Beats 1 and 4 must both use
+`optimistic_site_shortcut`. There the split audit points the way the narration
+does: re-scoring the same predictions on a patient-disjoint fold drops AUC from
+0.9875 to 0.9521 (gap +0.035), so Claude's own output will agree with what you say.
+
+Do **not** substitute `weak_random_split_leakage`. Its gap is *negative* (grouped
+0.899 beats random 0.827), and Claude correctly reports that "the leakage did not
+inflate the estimate." That is excellent science — the tool refuses a convenient
+narrative — but it flatly contradicts an opener that claims the number was inflated.
+Save it for the write-up, not the 3-minute cut.
+
 ---
 
 ## 0:00–0:15 — Intro
@@ -40,10 +51,11 @@ deterministic Python — Claude never computes a number, it only explains the ri
 
 **Say:** Pooled AUC is 0.9647. That would clear review in most venues. But look at
 the left panel: 990 of the 1,002 test patients — 98.8 percent — also appear in the
-training set. This split is random, not patient-grouped. So that headline number
-isn't evidence of generalisation; it's an artifact of leakage. And notice what
-produced that verdict: the JSON underneath it. No language model touched these
-figures.
+training set. The split is random, not patient-grouped, so this number never
+measured held-out performance in the first place. And when the same predictions are
+re-scored on a patient-disjoint fold, the AUC falls from 0.988 to 0.952. Every one
+of those figures came from deterministic Python — the JSON underneath is exactly
+what Claude is about to receive. No language model touched them.
 
 ---
 

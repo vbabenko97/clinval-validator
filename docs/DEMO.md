@@ -123,7 +123,12 @@ invents none.
 
 ## 2:40–2:52 — Terminal cut: it's a real tool
 
+**Do:** Export the key **in this shell first** — a terminal you just opened does not
+inherit it from the one running Streamlit, and without it the CLI prints the JSON
+plus a "key is not set" notice instead of the critique.
+
 ```bash
+export ANTHROPIC_API_KEY=sk-ant-...
 clinval-validate --predictions claude-science-artifacts/scenarios/optimistic_site_shortcut.csv --mode critique
 python -m pytest -q
 ```

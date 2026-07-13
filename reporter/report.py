@@ -29,11 +29,20 @@ CRITIQUE_SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "reviewer_critique_system_prompt.md
 __all__ = [
     "render_report",
     "render_reviewer_critique",
+    "MissingAPIKeyError",
     "MODEL",
     "API_KEY_ENV",
     "SYSTEM_PROMPT_PATH",
     "CRITIQUE_SYSTEM_PROMPT_PATH",
 ]
+
+
+class MissingAPIKeyError(RuntimeError):
+    """Raised when the Anthropic key is absent from the environment.
+
+    Callers can distinguish "the user has not set a key" — an expected, actionable
+    condition — from a genuine failure, and report it without a traceback.
+    """
 
 
 def _load_system_prompt(path: Path) -> str:
@@ -54,7 +63,12 @@ def _render(payload: ReportPayload, system_prompt_path: Path) -> str:
     the payload as JSON, and returns the model's text. The key is never
     hard-coded, and no number is computed here — every figure comes from the JSON.
     """
-    client = Anthropic(api_key=os.environ[API_KEY_ENV])
+    try:
+        api_key = os.environ[API_KEY_ENV]
+    except KeyError as exc:
+        raise MissingAPIKeyError(f"{API_KEY_ENV} is not set in the environment.") from exc
+
+    client = Anthropic(api_key=api_key)
     message = client.messages.create(
         model=MODEL,
         max_tokens=1024,

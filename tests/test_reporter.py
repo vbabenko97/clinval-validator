@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
+
 import reporter
-from reporter import MODEL, render_report, render_reviewer_critique
+from reporter import MODEL, MissingAPIKeyError, render_report, render_reviewer_critique
 
 SAMPLE_PAYLOAD = {
     "leakage": {"overlapping_patient_ids": 940, "leakage_rate": 0.4702},
@@ -48,6 +50,20 @@ def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
     # The operative reviewer prompt is sent, not the file's Markdown doc header.
     assert "senior clinical-AI validation reviewer" in captured["system"]
     assert "# Reporter system prompt" not in captured["system"]
+
+
+def test_render_report_raises_a_named_error_when_the_key_is_absent(monkeypatch) -> None:
+    # A missing key is a user-facing condition, not a bug: it must not surface as a
+    # bare KeyError traceback. No network call is attempted.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(MissingAPIKeyError, match="ANTHROPIC_API_KEY"):
+        render_report(SAMPLE_PAYLOAD)
+
+
+def test_render_reviewer_critique_raises_a_named_error_when_the_key_is_absent(monkeypatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(MissingAPIKeyError, match="ANTHROPIC_API_KEY"):
+        render_reviewer_critique(SAMPLE_PAYLOAD)
 
 
 def test_render_reviewer_critique_sends_payload_json_to_opus(monkeypatch) -> None:

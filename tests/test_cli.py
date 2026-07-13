@@ -50,6 +50,21 @@ def test_cli_defaults_to_risk_mode(monkeypatch, capsys) -> None:
     assert capsys.readouterr().out.strip() == "RISK-DEFAULT"
 
 
+def test_cli_without_an_api_key_prints_the_payload_and_a_readable_error(monkeypatch, capsys) -> None:
+    # The deterministic layer runs offline, so a missing key must not lose that work
+    # or dump a traceback. This is the command that appears in the demo video.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    exit_code = cli.main(["--predictions", str(DEMO_CSV), "--mode", "critique"])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["leakage"]["overlapping_patient_ids"] == 940
+    assert "ANTHROPIC_API_KEY" in captured.err
+    assert "Traceback" not in captured.err
+    assert "KeyError" not in captured.err
+
+
 def test_cli_critique_mode_uses_reviewer_critique(monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "render_report", lambda payload: "RISK-UNUSED")
     monkeypatch.setattr(

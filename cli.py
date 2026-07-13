@@ -2,19 +2,22 @@
 
 Wires the two layers: load predictions -> run the deterministic validators ->
 assemble the report payload -> hand it to the reporter -> print the report. The
-compute and LLM logic live in ``validators`` and ``reporter``; the pieces that
-raise ``NotImplementedError`` are what Phase 1 fills in.
+compute logic lives in ``clinval_validators`` and runs offline; ``reporter`` is the
+only part that needs the network, so without an API key the validators still run and
+their JSON is printed.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
 
-from reporter import render_report, render_reviewer_critique
+from reporter import API_KEY_ENV, MissingAPIKeyError, render_report, render_reviewer_critique
 from clinval_validators import (
     ReportPayload,
     audit_split_quality,
@@ -65,7 +68,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     df = _load_predictions(args.predictions)
     payload = _assemble_payload(df)
     render = render_reviewer_critique if args.mode == "critique" else render_report
-    print(render(payload))
+    try:
+        print(render(payload))
+    except MissingAPIKeyError:
+        print(json.dumps(payload, indent=2))
+        print(
+            f"\nThe deterministic checks above ran offline and are complete.\n"
+            f"{API_KEY_ENV} is not set, so the {args.mode} report was not rendered.\n"
+            f"Set a key to add Claude's narration:\n"
+            f"    export {API_KEY_ENV}=sk-ant-...",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

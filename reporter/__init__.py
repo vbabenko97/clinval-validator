@@ -5,6 +5,7 @@ from .report import (
     CRITIQUE_SYSTEM_PROMPT_PATH,
     MODEL,
     SYSTEM_PROMPT_PATH,
+    MissingAPIKeyError,
     render_report,
     render_reviewer_critique,
 )
@@ -12,6 +13,7 @@ from .report import (
 __all__ = [
     "render_report",
     "render_reviewer_critique",
+    "MissingAPIKeyError",
     "MODEL",
     "API_KEY_ENV",
     "SYSTEM_PROMPT_PATH",

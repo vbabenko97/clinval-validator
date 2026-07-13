@@ -73,10 +73,21 @@ clinval-validate --predictions claude-science-artifacts/scenarios/weak_random_sp
 # Run the test suite.
 python -m pytest
 
-# Optional: launch the browser demo UI (pick a scenario, see the flags, then
-# render the risk report or reviewer critique with Claude).
+# Launch the browser UI (no terminal needed after this line).
 python -m pip install -e '.[demo]' && streamlit run app.py
 ```
+
+## Browser UI
+
+`streamlit run app.py` is the path a collaborator can run without you in the room:
+
+- Pick a bundled scenario **or upload your own `predictions.csv`**. A missing
+  required column is reported by name — not as a stack trace.
+- The deterministic checks run **offline and without an API key**: leakage count,
+  split audit, per-subgroup AUC, and the exact JSON that Claude would receive.
+- Press **Generate with Claude** for the risk report or the reviewer critique.
+  Both are optional — the validation stands on its own.
+- **Download** the payload as JSON and the report as Markdown.
 
 ## Sample output
 

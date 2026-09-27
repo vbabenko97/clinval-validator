@@ -5,6 +5,14 @@ patient-level data leakage, weak evaluation splits, and subgroup degradation —
 in a model's `predictions.csv`, then render a human-readable Validation Risk
 Report.
 
+![ClinVal Validator browser UI flagging 940 patients shared across train and test in the weak_random_split_leakage scenario](docs/images/app-weak-random-split-leakage.png)
+
+*Offline audit of the bundled synthetic `weak_random_split_leakage` scenario in the
+[browser UI](#browser-ui); no Claude report was requested. The fourth metric is AUC on
+the patient-disjoint subset: its +0.072 delta compares two evaluation populations
+under unchanged predictions — it is not a model improvement and does not mean the
+leakage is fixed.*
+
 Built from scratch for **Built with Claude: Life Sciences** (Builder Track),
 started 2026-07-07.
 

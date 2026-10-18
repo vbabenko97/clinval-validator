@@ -91,6 +91,21 @@ def test_cli_without_an_api_key_prints_the_payload_and_a_readable_error(monkeypa
     assert "KeyError" not in captured.err
 
 
+def test_cli_prints_the_payload_when_claude_returns_no_complete_report(monkeypatch, capsys) -> None:
+    def cut_off(payload):
+        raise cli.ReportNotRenderedError("Claude returned no complete report (stop_reason: max_tokens).")
+
+    monkeypatch.setattr(cli, "render_report", cut_off)
+
+    exit_code = cli.main(["--predictions", str(DEMO_CSV)])
+
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["risk"]["level"] == "RED"
+    assert "max_tokens" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_cli_critique_mode_uses_reviewer_critique(monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli, "render_report", lambda payload: "RISK-UNUSED")
     monkeypatch.setattr(

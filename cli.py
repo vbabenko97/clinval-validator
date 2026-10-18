@@ -17,7 +17,13 @@ from pathlib import Path
 import pandas as pd
 
 from clinval_validators import run_checks, validate_predictions
-from reporter import API_KEY_ENV, MissingAPIKeyError, render_report, render_reviewer_critique
+from reporter import (
+    API_KEY_ENV,
+    MissingAPIKeyError,
+    ReportNotRenderedError,
+    render_report,
+    render_reviewer_critique,
+)
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -64,6 +70,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{API_KEY_ENV} is not set, so the {args.mode} report was not rendered.\n"
             f"Set a key to add Claude's narration:\n"
             f"    export {API_KEY_ENV}=sk-ant-...",
+            file=sys.stderr,
+        )
+        return 1
+    except ReportNotRenderedError as exc:
+        print(json.dumps(payload, indent=2))
+        print(
+            f"\nThe deterministic checks above ran offline and are complete.\n"
+            f"{exc} The {args.mode} report was not rendered.",
             file=sys.stderr,
         )
         return 1

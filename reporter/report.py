@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from clinval_validators import ReportPayload
 
 MODEL = "claude-opus-4-8"
+# The longest live Opus 4.8 report used 998 output tokens, so 1024 left almost no
+# margin. Only generated tokens are billed; the cap is a ceiling, not a cost.
+MAX_TOKENS = 4096
 API_KEY_ENV = "ANTHROPIC_API_KEY"
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "opus-4-8"
 SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "reporter_system_prompt.md"
@@ -30,7 +33,9 @@ __all__ = [
     "render_report",
     "render_reviewer_critique",
     "MissingAPIKeyError",
+    "ReportNotRenderedError",
     "MODEL",
+    "MAX_TOKENS",
     "API_KEY_ENV",
     "SYSTEM_PROMPT_PATH",
     "CRITIQUE_SYSTEM_PROMPT_PATH",
@@ -42,6 +47,15 @@ class MissingAPIKeyError(RuntimeError):
 
     Callers can distinguish "the user has not set a key" — an expected, actionable
     condition — from a genuine failure, and report it without a traceback.
+    """
+
+
+class ReportNotRenderedError(RuntimeError):
+    """Raised when Claude's reply holds no complete report.
+
+    That happens when the reply stops at ``max_tokens``, is refused
+    (``stop_reason == "refusal"``), or contains no text block. The deterministic
+    payload is unaffected, so callers can still show it.
     """
 
 
@@ -77,11 +91,18 @@ def _render(
     client = Anthropic(api_key=api_key)
     message = client.messages.create(
         model=MODEL,
-        max_tokens=1024,
+        max_tokens=MAX_TOKENS,
         system=_load_system_prompt(system_prompt_path),
         messages=[{"role": "user", "content": json.dumps(payload)}],
     )
-    return message.content[0].text
+    # A model that thinks returns a thinking block before the text, so the first
+    # block is not always the report.
+    text = "".join(block.text for block in message.content if block.type == "text")
+    if message.stop_reason in ("max_tokens", "refusal") or not text:
+        raise ReportNotRenderedError(
+            f"Claude returned no complete report (stop_reason: {message.stop_reason})."
+        )
+    return text
 
 
 def render_report(payload: ReportPayload, api_key: str | None = None) -> str:

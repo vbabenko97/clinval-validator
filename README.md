@@ -69,7 +69,7 @@ echo "exit code: $?"
 python -m pytest -q
 ```
 
-With `ANTHROPIC_API_KEY` set, the same command prints the risk report instead of the payload and exits 0. `--mode critique` asks for a reviewer critique and a Methods paragraph. The key is read from the environment. It is not stored in the repository.
+With `ANTHROPIC_API_KEY` set, the same command prints the risk report instead of the payload and exits 0. `--mode critique` asks for a reviewer critique and a Methods paragraph. The key is read from the environment. It is not stored in the repository. If Claude's reply is cut off at the 4,096-token limit, refused, or contains no text, the command prints the payload, names the stop reason on stderr, and exits 1; the browser UI shows the same message.
 
 ```bash
 python -m pip install -e '.[demo]'

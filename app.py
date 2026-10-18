@@ -18,7 +18,13 @@ from pathlib import Path
 import pandas as pd
 
 from clinval_validators import run_checks, validate_predictions
-from reporter import API_KEY_ENV, render_report, render_reviewer_critique
+from reporter import (
+    API_KEY_ENV,
+    MODEL,
+    ReportNotRenderedError,
+    render_report,
+    render_reviewer_critique,
+)
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "claude-science-artifacts" / "scenarios"
 
@@ -127,9 +133,12 @@ def main() -> None:
             st.warning("Set an Anthropic API key to render the report.", icon="🔑")
         elif generate:
             render = render_reviewer_critique if mode == "critique" else render_report
-            with st.spinner(f"Asking claude-opus-4-8 for the {mode} report…"):
-                cached = (report_key, render(payload, api_key=api_key))
-            st.session_state["report"] = cached
+            try:
+                with st.spinner(f"Asking {MODEL} for the {mode} report…"):
+                    cached = (report_key, render(payload, api_key=api_key))
+                st.session_state["report"] = cached
+            except ReportNotRenderedError as exc:
+                st.error(f"{exc} The deterministic payload on the left is complete.", icon="🚫")
 
         if cached and cached[0] == report_key:
             st.markdown(cached[1])

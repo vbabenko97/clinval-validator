@@ -11,12 +11,36 @@ import pytest
 import reporter
 from reporter import (
     CRITIQUE_SYSTEM_PROMPT_PATH,
+    MAX_TOKENS,
     MODEL,
     SYSTEM_PROMPT_PATH,
     MissingAPIKeyError,
+    ReportNotRenderedError,
     render_report,
     render_reviewer_critique,
 )
+
+
+def _text(text: str) -> SimpleNamespace:
+    return SimpleNamespace(type="text", text=text)
+
+
+def _fake_client(monkeypatch, content: list, stop_reason: str = "end_turn") -> dict:
+    """Replace the Anthropic client; return the dict that records each request."""
+    captured: dict = {}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(content=content, stop_reason=stop_reason)
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            captured["api_key"] = api_key
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+    return captured
 
 # leakage_rate is 940 / 959 on weak_random_split_leakage. The other fields match
 # the current payload contract; this dict is a stub, not a full scenario dump.
@@ -83,26 +107,14 @@ def test_prompts_name_the_fields_python_computes() -> None:
 
 def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    captured: dict = {}
-
-    class FakeMessages:
-        def create(self, **kwargs):
-            captured.update(kwargs)
-            return SimpleNamespace(content=[SimpleNamespace(text="RED: leakage present")])
-
-    class FakeAnthropic:
-        def __init__(self, api_key=None):
-            captured["api_key"] = api_key
-            self.messages = FakeMessages()
-
-    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+    captured = _fake_client(monkeypatch, [_text("RED: leakage present")])
 
     report_text = render_report(SAMPLE_PAYLOAD)
 
     assert report_text == "RED: leakage present"
     assert captured["api_key"] == "test-key"
     assert captured["model"] == MODEL == "claude-opus-4-8"
-    assert captured["max_tokens"] == 1024
+    assert captured["max_tokens"] == MAX_TOKENS == 4096
 
     user_message = captured["messages"][0]
     assert user_message["role"] == "user"
@@ -115,19 +127,7 @@ def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
 
 def test_api_key_argument_reaches_the_client_without_changing_the_environment(monkeypatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key")
-    captured: dict = {}
-
-    class FakeMessages:
-        def create(self, **kwargs):
-            captured.update(kwargs)
-            return SimpleNamespace(content=[SimpleNamespace(text="ok")])
-
-    class FakeAnthropic:
-        def __init__(self, api_key=None):
-            captured["api_key"] = api_key
-            self.messages = FakeMessages()
-
-    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+    captured = _fake_client(monkeypatch, [_text("ok")])
 
     assert render_report(SAMPLE_PAYLOAD, api_key="input-key") == "ok"
     assert captured["api_key"] == "input-key"
@@ -150,28 +150,40 @@ def test_render_reviewer_critique_raises_a_named_error_when_the_key_is_absent(mo
         render_reviewer_critique(SAMPLE_PAYLOAD)
 
 
+def test_text_after_a_thinking_block_is_returned(monkeypatch) -> None:
+    # Models that think put a thinking block first; reading content[0].text would
+    # raise AttributeError on it.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    thinking = SimpleNamespace(type="thinking", thinking="")
+    _fake_client(monkeypatch, [thinking, _text("1. Overall risk"), _text(" RED")])
+    assert render_report(SAMPLE_PAYLOAD) == "1. Overall risk RED"
+
+
+@pytest.mark.parametrize("stop_reason", ["max_tokens", "refusal"])
+def test_a_cut_off_or_refused_reply_raises_a_named_error(monkeypatch, stop_reason: str) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    _fake_client(monkeypatch, [_text("1. Overall risk — RED. 940 patients")], stop_reason)
+    with pytest.raises(ReportNotRenderedError, match=stop_reason):
+        render_report(SAMPLE_PAYLOAD)
+
+
+def test_a_reply_without_text_raises_a_named_error(monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    _fake_client(monkeypatch, [SimpleNamespace(type="thinking", thinking="")])
+    with pytest.raises(ReportNotRenderedError):
+        render_reviewer_critique(SAMPLE_PAYLOAD)
+
+
 def test_render_reviewer_critique_sends_payload_json_to_opus(monkeypatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    captured: dict = {}
-
-    class FakeMessages:
-        def create(self, **kwargs):
-            captured.update(kwargs)
-            return SimpleNamespace(content=[SimpleNamespace(text="Reviewer verdict: reject")])
-
-    class FakeAnthropic:
-        def __init__(self, api_key=None):
-            captured["api_key"] = api_key
-            self.messages = FakeMessages()
-
-    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+    captured = _fake_client(monkeypatch, [_text("Reviewer verdict: reject")])
 
     critique_text = render_reviewer_critique(SAMPLE_PAYLOAD)
 
     assert critique_text == "Reviewer verdict: reject"
     assert captured["api_key"] == "test-key"
     assert captured["model"] == MODEL == "claude-opus-4-8"
-    assert captured["max_tokens"] == 1024
+    assert captured["max_tokens"] == MAX_TOKENS
 
     user_message = captured["messages"][0]
     assert user_message["role"] == "user"

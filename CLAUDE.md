@@ -21,7 +21,7 @@ Named user: a clinical-AI researcher / radiology-lab PhD student who trained a m
 ## Repo map — current state
 
 - [clinval_validators/](clinval_validators/) — deterministic checks. `run_checks` returns leakage, the split audit, subgroups, the pooled AUC, and `risk`.
-- [cli.py](cli.py) — `clinval-validate`. Prints the payload and exits 1 when `ANTHROPIC_API_KEY` is unset. Exits 2 when `validate_predictions` reports a problem.
+- [cli.py](cli.py) — `clinval-validate`. Prints the payload and exits 1 when `ANTHROPIC_API_KEY` is unset or Claude returns no complete report (`ReportNotRenderedError`: cut off at `max_tokens`, refused, or no text). Exits 2 when `validate_predictions` reports a problem.
 - [app.py](app.py) — Streamlit UI over the same checks. The typed API key is passed into the reporter and is not written to `os.environ`.
 - [reporter/](reporter/) — the only code that calls the network. Loads the two runtime prompts in [prompts/opus-4-8/](prompts/opus-4-8/); see [prompts/README.md](prompts/README.md).
 - [claude-science-artifacts/](claude-science-artifacts/) — synthetic-data generator and the committed scenario oracle (`scenarios/*.csv`, manifests, `_scenario_summary.csv`). Do not regenerate those fixtures to make a test pass.

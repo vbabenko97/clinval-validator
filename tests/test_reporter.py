@@ -7,7 +7,6 @@ import os
 from types import SimpleNamespace
 
 import anthropic
-import httpx
 import pytest
 
 import reporter
@@ -189,11 +188,11 @@ def test_an_api_error_raises_a_named_error(monkeypatch) -> None:
     # Without this the CLI printed a traceback and no payload, e.g. on a 403 for
     # an account that has used its credits.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    # The SDK's HTTP library differs by major version (httpx in 0.x, httpx2 in
+    # 1.x), so the response is a stand-in with the attributes the error reads.
+    response = SimpleNamespace(request=None, status_code=403, headers={})
     error = anthropic.PermissionDeniedError(
-        "credit balance is too low",
-        response=httpx.Response(403, request=request),
-        body=None,
+        "credit balance is too low", response=response, body=None
     )
 
     class FailingMessages:

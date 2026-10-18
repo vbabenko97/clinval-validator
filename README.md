@@ -1,12 +1,77 @@
-# clinval-validator
+# ClinVal Validator
 
-ClinVal Validator reads a model's `predictions.csv` and reports two failure modes that make a clinical-AI performance claim unsafe: the same patient in both the train and test splits, and a subgroup whose AUC is lower than the rest of the table. Python computes the metrics, the flags, and the risk level. Claude is instructed to turn that JSON into prose and to cite only numbers present in it. Nothing in this repository checks the text Claude returns. The reporter calls Claude Opus 5.5 (`claude-opus-5-5`) at low effort; if a safety classifier declines a request, the API reruns it on the model Anthropic recommends for that refusal category.
+[![tests](https://github.com/vbabenko97/clinval-validator/actions/workflows/tests.yml/badge.svg)](https://github.com/vbabenko97/clinval-validator/actions/workflows/tests.yml)
 
-![ClinVal Validator on weak_random_split_leakage: 940 leaked patients, test-split AUC 0.827, patient-disjoint sample AUC 0.899, and a RED banner](docs/images/app-weak-random-split-leakage.png)
+ClinVal Validator reads a model's `predictions.csv` and reports two failure modes that make a clinical-AI performance claim unsafe: the same patient in both the train and test splits, and a subgroup whose AUC is lower than the rest of the table. Python computes the metrics, the flags, and the risk level. Claude is instructed to turn that JSON into a validation risk report and to cite only numbers present in it. Nothing in this repository checks the text Claude returns.
 
-*Offline view of the bundled synthetic `weak_random_split_leakage` scenario. No API key was entered and no Claude report was requested. The fourth metric is the AUC of a patient sample drawn from all rows, including training rows. The +0.072 figure is that sample minus the test-split AUC. The RED line is the risk level computed by Python.*
+![ClinVal Validator on optimistic_site_shortcut: 990 leaked patients, leakage rate 98.8%, test-split AUC 0.988, patient-disjoint sample AUC 0.952, and a RED banner](docs/images/app-optimistic-site-shortcut.png)
+
+*Offline view of the bundled synthetic `optimistic_site_shortcut` scenario. No API key was entered and no Claude report was requested. A test-split AUC of 0.988 would look publishable, but 990 patients are in both the train and test splits, so Python sets the risk level to RED. The fourth metric is the AUC of a patient sample drawn from all rows, including training rows. The −0.035 figure is that sample minus the test-split AUC; it does not measure inflation.*
 
 The column names follow the Radiological Society of North America (RSNA) Screening Mammography Breast Cancer Detection dataset. This repository contains synthetic tables and that public schema only. It contains no RSNA images and no protected health information (PHI). It is not medical advice.
+
+## Quickstart
+
+```bash
+# Python 3.11+. Installs the package and pytest.
+python -m pip install -e '.[dev]'
+
+# ANTHROPIC_API_KEY unset: the JSON payload is printed and the process exits 1.
+clinval-validate --predictions claude-science-artifacts/scenarios/optimistic_site_shortcut.csv
+echo "exit code: $?"
+
+python -m pytest -q
+```
+
+With `ANTHROPIC_API_KEY` set, the same command prints the risk report instead of the payload and exits 0. The reporter calls Claude Opus 5.5 (`claude-opus-5-5`) at low effort; if a safety classifier declines a request, the API reruns it on the model Anthropic recommends for that refusal category. `--mode critique` asks for a reviewer critique and a Methods paragraph. The key is read from the environment. It is not stored in the repository. If the API request fails (for example no credits, an invalid key, or no connection), or Claude's reply is cut off at the 4,096-token limit, refused, or contains no text, the command prints the payload, states the reason on stderr, and exits 1; the browser UI shows the same message.
+
+```bash
+python -m pip install -e '.[demo]'
+streamlit run app.py
+```
+
+Each bundled scenario in [`claude-science-artifacts/scenarios/`](claude-science-artifacts/scenarios/) records its injected flaws, none for the clean control, in a `*.manifest.json` next to the CSV.
+
+| Scenario | Injected flaw | Risk level | What the checks report |
+|---|---|---|---|
+| `clean_patient_grouped` | none | GREEN | no patient overlap, no flagged subgroup |
+| `weak_random_split_leakage` | rows assigned to splits at random | RED | 940 patients in both train and test |
+| `duplicate_row_leakage` | near-duplicate rows copied from train to test | RED | 113 patients in both train and test |
+| `optimistic_site_shortcut` | high AUC, a site-correlated score offset, random split | RED | 990 patients in both train and test |
+| `subgroup_scanner_degradation` | low AUC on scanner `M030` | YELLOW | `machine_id` M030 and `site_id` S03 flagged |
+| `subgroup_density_degradation` | low AUC on density C and D | YELLOW | density C flagged |
+
+## Example report
+
+This report was rendered from the `optimistic_site_shortcut` payload in October 2026 with the reporter's model (`claude-opus-5-5`, low effort) and system prompt. It is one of three runs of that configuration in the model comparison recorded in [CLAUDE.md](CLAUDE.md). Claude's wording varies between runs. Each metric value in it is in that scenario's payload.
+
+> **1. Overall risk:** RED
+>
+> 990 patients appear in both the train and test splits, a leakage rate of 98.8%. Nearly every test patient was also seen in training, so test-split metrics do not measure performance on new patients.
+>
+> **2. What the data shows**
+>
+> - The test-split AUC is 0.9875. Because of the 98.8% patient overlap, it is not an unseen-patient estimate.
+> - split_audit rescored the same fixed predictions on a seed-0 patient sample drawn from all rows, including training rows. That sample gave AUC 0.9521, with a 95% range of 0.9363–0.9936 across seeds and a gap of 0.0354. This rescore says nothing about inflation in either direction.
+> - The pooled AUC over all rows is 0.9647. It is valid only if every y_prob is a held-out or out-of-fold prediction.
+> - Of 20 subgroups evaluated, 0 were flagged. 0 delta intervals lie entirely below zero and 9 lie entirely above zero, for example site S03 (+0.031, CI 0.018–0.048).
+> - Calibration-in-the-large is badly off in every subgroup. Machine M010 has mean predicted 0.753 against an observed rate of 0.033. Machine M001 has 0.462 against 0.0075. Predicted probabilities are many times the observed prevalence.
+>
+> **3. What can be claimed**
+>
+> - The model's scores rank positives above negatives within this dataset, which includes patients it trained on.
+> - No subgroup crossed the flagging threshold.
+> - The probabilities as output are severely miscalibrated.
+>
+> **4. What cannot be claimed**
+>
+> - **Any AUC as unseen-patient performance.** This covers the test-split figure (0.9875), the pooled figure (0.9647) and the patient-sample figure (0.9521). Metrics measured while the same patients sit in train and test do not estimate generalization.
+> - **Subgroup equity or the absence of subgroup weakness.** The subgroup comparisons inherit the same leakage.
+> - **Clinically usable probabilities or thresholds.** Calibration fails in every subgroup.
+>
+> **5. Next validation step**
+>
+> Retrain and evaluate with a patient-grouped split so that no test patient appears in training. Then recompute AUC, subgroup deltas and calibration on that held-out set. Re-scoring the existing predictions cannot fix the leakage.
 
 ## Risk level
 
@@ -54,29 +119,7 @@ patient_id, machine_id, site_id, y_true, y_prob, split
 
 The pooled AUC and the subgroup AUCs treat every row's `y_prob` as a held-out or out-of-fold prediction. A score that was produced on a row the model saw in training is not that quantity, and the file does not record which rows were held out beyond the `split` column.
 
-Labeled fixtures live in [`claude-science-artifacts/scenarios/`](claude-science-artifacts/scenarios/).
-
 An uploaded file that fails these checks is rejected before any metric runs. The command-line tool prints the problems on stderr and exits 2. The browser UI shows the same problems and stops.
-
-## Quickstart
-
-```bash
-# Python 3.11+. Installs the package and pytest.
-python -m pip install -e '.[dev]'
-
-# ANTHROPIC_API_KEY unset: the JSON payload is printed and the process exits 1.
-clinval-validate --predictions claude-science-artifacts/scenarios/weak_random_split_leakage.csv
-echo "exit code: $?"
-
-python -m pytest -q
-```
-
-With `ANTHROPIC_API_KEY` set, the same command prints the risk report instead of the payload and exits 0. `--mode critique` asks for a reviewer critique and a Methods paragraph. The key is read from the environment. It is not stored in the repository. If the API request fails (for example no credits, an invalid key, or no connection), or Claude's reply is cut off at the 4,096-token limit, refused, or contains no text, the command prints the payload, states the reason on stderr, and exits 1; the browser UI shows the same message.
-
-```bash
-python -m pip install -e '.[demo]'
-streamlit run app.py
-```
 
 ## Browser UI
 
@@ -91,32 +134,32 @@ streamlit run app.py
 
 ## Sample payload
 
-`run_checks` on `weak_random_split_leakage` produces the payload below. The `subgroups` list is truncated: the command prints all 20 evaluated subgroups, and only the first is shown here.
+`run_checks` on `optimistic_site_shortcut` produces the payload below, the input to the example report above. The `subgroups` list is truncated: the command prints all 20 evaluated subgroups, and only the first is shown here.
 
 ```json
 {
   "leakage": {
-    "overlapping_patient_ids": 940,
-    "leakage_rate": 0.9801876955161627
+    "overlapping_patient_ids": 990,
+    "leakage_rate": 0.9880239520958084
   },
   "split_audit": {
     "metric": "auc",
-    "test_split_as_given": 0.8272804054054055,
-    "patient_disjoint_sample": 0.8993770139634801,
-    "sample_range95": [0.7523126406555013, 0.933559031020775],
-    "gap": -0.07209660855807465
+    "test_split_as_given": 0.9875066988210075,
+    "patient_disjoint_sample": 0.9520676691729323,
+    "sample_range95": [0.936255881456941, 0.9936080337954574],
+    "gap": 0.035439029648075215
   },
   "subgroups": [
     {
       "key": "machine_id",
-      "value": "M031",
-      "n": 1020,
-      "auc": 0.8075241391874658,
-      "auc_rest": 0.8490112630891348,
-      "delta_vs_rest": -0.041487123901668976,
-      "delta_ci95": [-0.17020941694803463, 0.052104879910572145],
-      "mean_predicted": 0.511070955882353,
-      "observed_rate": 0.021568627450980392,
+      "value": "M010",
+      "n": 970,
+      "auc": 0.9869736140724946,
+      "auc_rest": 0.9659083160644035,
+      "delta_vs_rest": 0.021065298008091093,
+      "delta_ci95": [0.002677669640138633, 0.036634422874868566],
+      "mean_predicted": 0.7528614505154639,
+      "observed_rate": 0.032989690721649485,
       "flagged": false
     }
   ],
@@ -124,30 +167,16 @@ streamlit run app.py
     "evaluated": 20,
     "flagged": 0,
     "interval_below_zero": 0,
-    "interval_above_zero": 1
+    "interval_above_zero": 9
   },
-  "pooled_metric": {"name": "auc", "rows": "all", "value": 0.8424535490580416},
+  "pooled_metric": {"name": "auc", "rows": "all", "value": 0.9647255859375},
   "risk": {
     "level": "RED",
     "reasons": [
-      "940 patients appear in both the train and test splits (leakage rate 98.0%)."
+      "990 patients appear in both the train and test splits (leakage rate 98.8%)."
     ]
   }
 }
-```
-
-The report below is hand-written so that a reader can see the shape. It is not output from Claude.
-
-```
-1. Overall risk — RED. 940 patients appear in both the train and test splits (leakage rate 98.0%).
-
-2. What the data shows — The leakage rate is 0.9802, which is 940 divided by the number of distinct test patients. Pooled AUC is 0.8425. The test-split AUC is 0.8273 and the patient-disjoint sample AUC is 0.8994 (gap −0.0721). The sample range over seeds 0–199 is 0.7523 to 0.9336. No subgroup is flagged. The first subgroup, machine M031, has AUC 0.8075 against 0.8490 on the rest of the table.
-
-3. What can be claimed — The file records 940 patients on both sides of the split.
-
-4. What cannot be claimed — An AUC from this file does not estimate performance on patients who were absent from training.
-
-5. Next validation step — Retrain and evaluate with a patient-grouped split, so that no test patient was seen in training.
 ```
 
 The demo script is [docs/DEMO.md](docs/DEMO.md).
@@ -166,4 +195,4 @@ The default run writes `predictions_rsna_random.csv` and `predictions_rsna_patie
 
 MIT. See [LICENSE](LICENSE).
 
-July 2026 planning notes are in [docs/archive/](docs/archive/).
+Built for the Built with Claude: Life Sciences hackathon (Builder Track), July 2026. The planning notes from that week are in [docs/archive/](docs/archive/).

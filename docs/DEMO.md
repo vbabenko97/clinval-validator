@@ -8,6 +8,7 @@ Note (2026-10-18). The narration below is the script of a recorded video and is 
 - The risk level is now computed in Python.
 - Install `.[dev,demo]` before running pytest on camera.
 - Produce predictions_rsna_random.csv with `python rsna_to_predictions.py --input data/rsna/train.csv`.
+- The sidebar's API key field is no longer pre-filled. Leave it empty and the app uses the exported `ANTHROPIC_API_KEY`.
 
 **Logline.** A clinical-AI model reports an AUC that looks publishable. ClinVal
 Validator answers whether that number is real or an artifact of data leakage —

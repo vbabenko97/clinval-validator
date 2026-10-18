@@ -68,8 +68,12 @@ def main() -> None:
 
         st.header("Claude report")
         mode = st.radio("Mode", ["risk", "critique"], format_func=str.capitalize)
+        # The field starts empty: a widget's value is sent to the browser, so
+        # prefilling it would hand the server's key to every visitor.
         api_key = st.text_input(
-            "Anthropic API key", value=os.environ.get(API_KEY_ENV, ""), type="password"
+            "Anthropic API key",
+            type="password",
+            help=f"Leave empty to use {API_KEY_ENV} from the server environment.",
         )
         generate = st.button("Generate with Claude", type="primary")
 
@@ -137,13 +141,14 @@ def main() -> None:
         report_key = f"{mode}:{json.dumps(payload, sort_keys=True)}"
         cached = st.session_state.get("report")
 
-        if generate and not api_key:
+        if generate and not (api_key or os.environ.get(API_KEY_ENV)):
             st.warning("Set an Anthropic API key to render the report.", icon="🔑")
         elif generate:
             render = render_reviewer_critique if mode == "critique" else render_report
             try:
                 with st.spinner(f"Asking {MODEL} for the {mode} report…"):
-                    cached = (report_key, render(payload, api_key=api_key))
+                    # None makes the reporter read the server's ANTHROPIC_API_KEY.
+                    cached = (report_key, render(payload, api_key=api_key or None))
                 st.session_state["report"] = cached
             except ReportNotRenderedError as exc:
                 st.error(f"{exc} The deterministic payload on the left is complete.", icon="🚫")

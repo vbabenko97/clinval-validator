@@ -21,8 +21,8 @@ Named user: a clinical-AI researcher / radiology-lab PhD student who trained a m
 ## Repo map — current state
 
 - [clinval_validators/](clinval_validators/) — deterministic checks. `run_checks` returns leakage, the split audit, subgroups, the pooled AUC, and `risk`.
-- [cli.py](cli.py) — `clinval-validate`. Prints the payload and exits 1 when `ANTHROPIC_API_KEY` is unset or Claude returns no complete report (`ReportNotRenderedError`: cut off at `max_tokens`, refused, or no text). Exits 2 when `validate_predictions` reports a problem.
-- [app.py](app.py) — Streamlit UI over the same checks. The typed API key is passed into the reporter and is not written to `os.environ`.
+- [cli.py](cli.py) — `clinval-validate`. Prints the payload and exits 1 when `ANTHROPIC_API_KEY` is unset or Claude returns no complete report (`ReportNotRenderedError`: the API request failed, or the reply was cut off at `max_tokens`, refused, or had no text). Exits 2 when `validate_predictions` reports a problem.
+- [app.py](app.py) — Streamlit UI over the same checks. The typed API key is passed into the reporter and is not written to `os.environ`. An empty field falls back to the server's `ANTHROPIC_API_KEY`; do not prefill the field with it, because widget values reach the browser.
 - [reporter/](reporter/) — the only code that calls the network. Loads the two runtime prompts in [prompts/](prompts/); see [prompts/README.md](prompts/README.md).
 - [claude-science-artifacts/](claude-science-artifacts/) — synthetic-data generator and the committed scenario oracle (`scenarios/*.csv`, manifests, `_scenario_summary.csv`). Do not regenerate those fixtures to make a test pass.
 - [rsna_to_predictions.py](rsna_to_predictions.py) — local-only adapter for an RSNA `train.csv`. Outputs are gitignored.

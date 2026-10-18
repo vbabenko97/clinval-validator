@@ -6,6 +6,8 @@ import json
 import os
 from types import SimpleNamespace
 
+import anthropic
+import httpx
 import pytest
 
 import reporter
@@ -181,6 +183,31 @@ def test_a_cut_off_or_refused_reply_raises_a_named_error(monkeypatch, stop_reaso
     _fake_client(monkeypatch, [_text("1. Overall risk — RED. 940 patients")], stop_reason)
     with pytest.raises(ReportNotRenderedError, match=stop_reason):
         render_report(SAMPLE_PAYLOAD)
+
+
+def test_an_api_error_raises_a_named_error(monkeypatch) -> None:
+    # Without this the CLI printed a traceback and no payload, e.g. on a 403 for
+    # an account that has used its credits.
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    error = anthropic.PermissionDeniedError(
+        "credit balance is too low",
+        response=httpx.Response(403, request=request),
+        body=None,
+    )
+
+    class FailingMessages:
+        def create(self, **kwargs):
+            raise error
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            self.beta = SimpleNamespace(messages=FailingMessages())
+
+    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+    with pytest.raises(ReportNotRenderedError, match="credit balance is too low") as caught:
+        render_report(SAMPLE_PAYLOAD)
+    assert caught.value.__cause__ is error
 
 
 def test_a_reply_without_text_raises_a_named_error(monkeypatch) -> None:

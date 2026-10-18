@@ -71,7 +71,7 @@ echo "exit code: $?"
 python -m pytest -q
 ```
 
-With `ANTHROPIC_API_KEY` set, the same command prints the risk report instead of the payload and exits 0. `--mode critique` asks for a reviewer critique and a Methods paragraph. The key is read from the environment. It is not stored in the repository. If Claude's reply is cut off at the 4,096-token limit, refused, or contains no text, the command prints the payload, names the stop reason on stderr, and exits 1; the browser UI shows the same message.
+With `ANTHROPIC_API_KEY` set, the same command prints the risk report instead of the payload and exits 0. `--mode critique` asks for a reviewer critique and a Methods paragraph. The key is read from the environment. It is not stored in the repository. If the API request fails (for example no credits, an invalid key, or no connection), or Claude's reply is cut off at the 4,096-token limit, refused, or contains no text, the command prints the payload, states the reason on stderr, and exits 1; the browser UI shows the same message.
 
 ```bash
 python -m pip install -e '.[demo]'
@@ -85,6 +85,7 @@ streamlit run app.py
 - Choose a bundled scenario or upload a `predictions.csv`.
 - The checks run without an API key. The page shows the leakage count, the split audit, and the JSON payload, including `risk.level`.
 - The key typed into the sidebar is sent only with that session's request. It is not written into the process environment.
+- When the key field is empty, the app uses `ANTHROPIC_API_KEY` from the server environment. That key stays on the server; the field is never prefilled with it.
 - **Generate with Claude** asks for the risk report or the reviewer critique. Both are optional.
 - Download the payload as JSON and, after a report is generated, the report as Markdown.
 

@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from anthropic import Anthropic
+from anthropic import Anthropic, APIError
 
 if TYPE_CHECKING:
     from clinval_validators import ReportPayload
@@ -61,9 +61,10 @@ class MissingAPIKeyError(RuntimeError):
 class ReportNotRenderedError(RuntimeError):
     """Raised when Claude's reply holds no complete report.
 
-    That happens when the reply stops at ``max_tokens``, is refused
-    (``stop_reason == "refusal"``), or contains no text block. The deterministic
-    payload is unaffected, so callers can still show it.
+    That happens when the API request fails (for example no credits, an
+    invalid key, or no connection), or when the reply stops at ``max_tokens``,
+    is refused (``stop_reason == "refusal"``), or contains no text block. The
+    deterministic payload is unaffected, so callers can still show it.
     """
 
 
@@ -97,17 +98,21 @@ def _render(
         raise MissingAPIKeyError(f"{API_KEY_ENV} is not set in the environment.")
 
     client = Anthropic(api_key=api_key)
-    message = client.beta.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=_load_system_prompt(system_prompt_path),
-        messages=[{"role": "user", "content": json.dumps(payload)}],
-        output_config={"effort": EFFORT},
-        betas=[FALLBACK_BETA],
-        # The SDK types `fallbacks` as a list of models; the "default" mode is a
-        # string the API accepts, so it goes in the raw body.
-        extra_body={"fallbacks": "default"},
-    )
+    try:
+        message = client.beta.messages.create(
+            model=MODEL,
+            max_tokens=MAX_TOKENS,
+            system=_load_system_prompt(system_prompt_path),
+            messages=[{"role": "user", "content": json.dumps(payload)}],
+            output_config={"effort": EFFORT},
+            betas=[FALLBACK_BETA],
+            # The SDK types `fallbacks` as a list of models; the "default" mode is a
+            # string the API accepts, so it goes in the raw body.
+            extra_body={"fallbacks": "default"},
+        )
+    except APIError as exc:
+        detail = str(exc).rstrip(".")
+        raise ReportNotRenderedError(f"The Claude API request failed: {detail}.") from exc
     # Opus 5.5 returns thinking blocks (and, after a fallback, a fallback block)
     # before the text, so the first block is not always the report.
     text = "".join(block.text for block in message.content if block.type == "text")

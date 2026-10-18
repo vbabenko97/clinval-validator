@@ -14,11 +14,14 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
 
-# Subgroup flag thresholds, calibrated against the labeled scenarios: M030 in
-# subgroup_scanner_degradation sits 0.21 below pooled and must flag, while every
-# subgroup in clean_patient_grouped is within 0.07 of pooled and must not.
+# Subgroup flag thresholds, calibrated on the committed fixtures. A subgroup
+# flags when its AUC is at least 0.10 below the rest of the table and the
+# patient-level 95% interval for that drop lies entirely below zero. M030 in
+# subgroup_scanner_degradation must flag; clean_patient_grouped must not.
 _FLAG_DELTA = -0.10
 _MIN_SUBGROUP_N = 50
+_BOOTSTRAP_REPLICATES = 200
+_BOOTSTRAP_SEED = 0
 
 # Columns the checks read by name. Anything else in the table is ignored.
 _REQUIRED_COLUMNS = ("patient_id", "machine_id", "site_id", "y_true", "y_prob", "split")
@@ -59,7 +62,11 @@ class SubgroupResult(TypedDict):
     value: str
     n: int
     auc: float
-    delta_vs_pooled: float
+    auc_rest: float
+    delta_vs_rest: float
+    delta_ci95: list[float] | None
+    mean_predicted: float
+    observed_rate: float
     flagged: bool
 
 
@@ -172,43 +179,172 @@ def audit_split_quality(df: pd.DataFrame) -> SplitAuditResult:
     }
 
 
-def check_subgroup_degradation(df: pd.DataFrame) -> list[SubgroupResult]:
-    """Compute per-``machine_id``/``site_id`` AUC and flag degraded subgroups.
+def _roc_auc(y_true: np.ndarray, y_score: np.ndarray) -> float:
+    """ROC AUC with average ranks for ties, the same definition sklearn uses.
 
-    Returns one entry per evaluated subgroup, each carrying its AUC, delta
-    versus the pooled metric, and whether it is flagged as significantly below
-    pooled performance. A subgroup is skipped (not evaluated) when it has fewer
-    than ``_MIN_SUBGROUP_N`` rows or lacks both classes, since its AUC would be
-    undefined or too noisy to trust.
+    A rank statistic keeps the patient-level bootstrap under a few seconds.
     """
-    pooled_auc = float(roc_auc_score(df["y_true"], df["y_prob"]))
-    results: list[SubgroupResult] = []
+    y_true = np.asarray(y_true)
+    y_score = np.asarray(y_score, dtype=np.float64)
+    n_pos = int(np.sum(y_true == 1))
+    n = y_true.size
+    n_neg = n - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(y_score, kind="mergesort")
+    y_sorted = y_true[order]
+    scores = y_score[order]
+    change = np.empty(n, dtype=bool)
+    change[0] = True
+    change[1:] = scores[1:] != scores[:-1]
+    group = np.cumsum(change) - 1
+    counts = np.bincount(group)
+    ends = np.cumsum(counts)
+    average_rank = (ends - counts + 1 + ends) / 2.0
+    sum_pos = float(average_rank[group][y_sorted == 1].sum())
+    return (sum_pos - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
+
+
+def _both_classes(y_true: np.ndarray) -> bool:
+    return bool(y_true.size) and bool((y_true == 0).any()) and bool((y_true == 1).any())
+
+
+def _patient_bootstrap_indices(patient_id: pd.Series) -> list[np.ndarray]:
+    """Row indices for each patient-level resample of the whole table.
+
+    Patients are drawn with replacement. A patient drawn twice contributes
+    their rows twice. One draw is reused for every subgroup.
+    """
+    codes, _ = pd.factorize(patient_id, sort=False)
+    order = np.argsort(codes, kind="mergesort")
+    sorted_codes = codes[order]
+    starts = np.flatnonzero(np.r_[True, sorted_codes[1:] != sorted_codes[:-1]])
+    counts = np.diff(np.r_[starts, len(patient_id)])
+    n_patients = len(counts)
+    draws = np.random.default_rng(_BOOTSTRAP_SEED).integers(
+        0, n_patients, size=(_BOOTSTRAP_REPLICATES, n_patients)
+    )
+    indices: list[np.ndarray] = []
+    for draw in draws:
+        repeated = counts[draw]
+        total = int(repeated.sum())
+        within = np.arange(total) - np.repeat(np.cumsum(repeated) - repeated, repeated)
+        indices.append(order[np.repeat(starts[draw], repeated) + within])
+    return indices
+
+
+def _value_masks(values: np.ndarray) -> list[tuple[str, np.ndarray]]:
+    masks: list[tuple[str, np.ndarray]] = []
+    for value in pd.unique(values):
+        if pd.isna(value):
+            continue
+        masks.append((str(value), values == value))
+    return masks
+
+
+def _age_band_masks(age: pd.Series) -> list[tuple[str, np.ndarray]]:
+    """Decade bands such as ``50-59``. Missing ages are skipped."""
+    numeric = pd.to_numeric(age, errors="coerce").to_numpy(dtype=float)
+    valid = ~np.isnan(numeric)
+    decade = np.full(numeric.size, -1, dtype=int)
+    decade[valid] = (np.floor(numeric[valid] / 10.0) * 10).astype(int)
+    masks: list[tuple[str, np.ndarray]] = []
+    for band in sorted(set(decade[valid].tolist())):
+        masks.append((f"{band}-{band + 9}", decade == band))
+    return masks
+
+
+def _subgroup_specs(df: pd.DataFrame) -> list[tuple[str, str, np.ndarray]]:
+    specs: list[tuple[str, str, np.ndarray]] = []
     for key in ("machine_id", "site_id"):
-        for value, group in df.groupby(key):
-            if len(group) < _MIN_SUBGROUP_N or group["y_true"].nunique() < 2:
+        for label, mask in _value_masks(df[key].to_numpy()):
+            specs.append((key, label, mask))
+    if "density" in df.columns:
+        for label, mask in _value_masks(df["density"].to_numpy()):
+            specs.append(("density", label, mask))
+    if "age" in df.columns:
+        for label, mask in _age_band_masks(df["age"]):
+            specs.append(("age", label, mask))
+    return specs
+
+
+def check_subgroup_degradation(df: pd.DataFrame) -> list[SubgroupResult]:
+    """Compare each subgroup's AUC with the rest of the table.
+
+    Evaluates ``machine_id`` and ``site_id``, and ``density`` and decade age
+    bands when those columns exist. A subgroup is evaluated only when it has
+    at least ``_MIN_SUBGROUP_N`` rows and both the subgroup and the rest of
+    the table contain both classes.
+
+    ``delta_vs_rest`` is the subgroup AUC minus the AUC of every other row.
+    ``delta_ci95`` is the 2.5th and 97.5th percentile of that difference over
+    a patient-level bootstrap (resample ``patient_id`` with replacement,
+    200 replicates, seed 0). Replicates that lack a class in the subgroup or
+    in the rest are skipped. The subgroup is flagged when ``delta_vs_rest``
+    is at or below ``_FLAG_DELTA`` and the upper end of ``delta_ci95`` is
+    below zero.
+
+    ``mean_predicted`` and ``observed_rate`` are calibration-in-the-large for
+    the subgroup. They are reported and never used to flag.
+    """
+    y_true = df["y_true"].to_numpy()
+    y_prob = df["y_prob"].to_numpy(dtype=float)
+    boots = _patient_bootstrap_indices(df["patient_id"])
+    results: list[SubgroupResult] = []
+    for key, value, mask in _subgroup_specs(df):
+        n_sub = int(mask.sum())
+        if n_sub < _MIN_SUBGROUP_N:
+            continue
+        y_sub = y_true[mask]
+        y_rest = y_true[~mask]
+        if not _both_classes(y_sub) or not _both_classes(y_rest):
+            continue
+        auc = _roc_auc(y_sub, y_prob[mask])
+        auc_rest = _roc_auc(y_rest, y_prob[~mask])
+        delta = auc - auc_rest
+        deltas: list[float] = []
+        for idx in boots:
+            drawn = mask[idx]
+            if not drawn.any() or not (~drawn).any():
                 continue
-            auc = float(roc_auc_score(group["y_true"], group["y_prob"]))
-            delta = auc - pooled_auc
-            results.append(
-                {
-                    "key": key,
-                    "value": str(value),
-                    "n": len(group),
-                    "auc": auc,
-                    "delta_vs_pooled": delta,
-                    "flagged": delta <= _FLAG_DELTA,
-                }
+            y_draw = y_true[idx]
+            p_draw = y_prob[idx]
+            y_draw_sub = y_draw[drawn]
+            y_draw_rest = y_draw[~drawn]
+            if not _both_classes(y_draw_sub) or not _both_classes(y_draw_rest):
+                continue
+            deltas.append(
+                _roc_auc(y_draw_sub, p_draw[drawn]) - _roc_auc(y_draw_rest, p_draw[~drawn])
             )
+        if deltas:
+            low, high = (float(bound) for bound in np.percentile(deltas, [2.5, 97.5]))
+            ci: list[float] | None = [low, high]
+            flagged = bool(delta <= _FLAG_DELTA and high < 0)
+        else:
+            ci = None
+            flagged = False
+        results.append(
+            {
+                "key": key,
+                "value": value,
+                "n": n_sub,
+                "auc": float(auc),
+                "auc_rest": float(auc_rest),
+                "delta_vs_rest": float(delta),
+                "delta_ci95": ci,
+                "mean_predicted": float(y_prob[mask].mean()),
+                "observed_rate": float(np.mean(y_sub)),
+                "flagged": flagged,
+            }
+        )
     return results
 
 
 def compute_pooled_metric(df: pd.DataFrame) -> PooledMetric:
     """Compute the pooled headline metric (AUC) over all rows.
 
-    This is the reference value that subgroup deltas are measured against and
-    the ``pooled_metric`` field of the report payload. AUC is computed over the
-    full table (not the test split alone) to match each manifest's
-    ``verification.overall_auc`` and give every subgroup enough positives for a
-    defined per-subgroup AUC at this dataset's ~1.5% prevalence.
+    Assumes every row's ``y_prob`` is a held-out or out-of-fold prediction.
+    AUC is computed over the full table (not the test split alone) to match
+    each manifest's ``verification.overall_auc``.
     """
     return {"name": "auc", "value": float(roc_auc_score(df["y_true"], df["y_prob"]))}

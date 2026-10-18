@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
 pd = pytest.importorskip("pandas")
+
+_GENERATOR_DIR = Path(__file__).resolve().parent.parent / "claude-science-artifacts"
+sys.path.insert(0, str(_GENERATOR_DIR))
 
 from clinval_validators import (  # noqa: E402
     audit_split_quality,
@@ -14,6 +18,12 @@ from clinval_validators import (  # noqa: E402
     check_subgroup_degradation,
     compute_pooled_metric,
     validate_predictions,
+)
+from leakage_generator import (  # noqa: E402
+    Flaws,
+    GeneratorConfig,
+    SubgroupDegradation,
+    generate,
 )
 
 SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "claude-science-artifacts" / "scenarios"
@@ -136,25 +146,88 @@ def test_pooled_metric_matches_manifest_overall_auc(scenario: str, expected_auc:
 
 # --- Check 3: subgroup degradation ---------------------------------------
 
+# make_scenarios.py builds the committed fixtures with seeds 1 through 6.
+_FRESH_CLEAN_SEEDS = (11, 12, 13, 14, 15)
+_FRESH_SCANNER_SEEDS = (7, 8, 9, 12, 13)
 
-def test_subgroup_degradation_is_detectable() -> None:
-    subgroups = check_subgroup_degradation(_load("subgroup_scanner_degradation"))
+
+@pytest.fixture(scope="module")
+def subgroups_by_scenario() -> dict[str, list]:
+    """Run the subgroup check once per committed scenario."""
+    names = (
+        "clean_patient_grouped",
+        "weak_random_split_leakage",
+        "duplicate_row_leakage",
+        "subgroup_scanner_degradation",
+        "subgroup_density_degradation",
+        "optimistic_site_shortcut",
+    )
+    return {name: check_subgroup_degradation(_load(name)) for name in names}
+
+
+def test_subgroup_degradation_is_detectable(subgroups_by_scenario: dict[str, list]) -> None:
+    subgroups = subgroups_by_scenario["subgroup_scanner_degradation"]
     assert any(sg["flagged"] for sg in subgroups)
     m030 = next(sg for sg in subgroups if sg["key"] == "machine_id" and sg["value"] == "M030")
     assert m030["flagged"]
     assert m030["auc"] == pytest.approx(0.6243, abs=1e-4)
-    assert m030["delta_vs_pooled"] < -0.10
+    assert m030["delta_vs_rest"] == pytest.approx(m030["auc"] - m030["auc_rest"])
+    assert m030["delta_vs_rest"] <= -0.10
+    assert m030["delta_ci95"] is not None
+    assert m030["delta_ci95"][1] < 0
+    assert 0.0 <= m030["mean_predicted"] <= 1.0
+    assert 0.0 <= m030["observed_rate"] <= 1.0
 
 
-def test_no_subgroup_flags_on_clean_scenario() -> None:
-    subgroups = check_subgroup_degradation(_load("clean_patient_grouped"))
+def test_density_degradation_flags_c_or_d_not_a_or_b(subgroups_by_scenario: dict[str, list]) -> None:
+    flagged = {
+        (sg["key"], sg["value"])
+        for sg in subgroups_by_scenario["subgroup_density_degradation"]
+        if sg["flagged"]
+    }
+    assert ("density", "C") in flagged or ("density", "D") in flagged
+    assert ("density", "A") not in flagged
+    assert ("density", "B") not in flagged
+
+
+def test_no_subgroup_flags_on_clean_scenario(subgroups_by_scenario: dict[str, list]) -> None:
+    subgroups = subgroups_by_scenario["clean_patient_grouped"]
     assert subgroups  # subgroups were evaluated
     assert not any(sg["flagged"] for sg in subgroups)
 
 
-def test_subgroup_results_cover_machine_and_site_keys() -> None:
-    keys = {sg["key"] for sg in check_subgroup_degradation(_load("clean_patient_grouped"))}
-    assert keys == {"machine_id", "site_id"}
+def test_subgroup_results_cover_machine_site_density_and_age(
+    subgroups_by_scenario: dict[str, list],
+) -> None:
+    subgroups = subgroups_by_scenario["clean_patient_grouped"]
+    assert {sg["key"] for sg in subgroups} == {"machine_id", "site_id", "density", "age"}
+    assert "50-59" in {sg["value"] for sg in subgroups if sg["key"] == "age"}
+
+
+def test_fresh_seeds_flag_scanner_degradation_and_not_clean_tables() -> None:
+    # Seeds 1–6 are the committed fixtures. These are other draws of the same
+    # generator configs: five clean tables, five with M030 degraded to AUC 0.62.
+    used_by_make_scenarios = {1, 2, 3, 4, 5, 6}
+    assert used_by_make_scenarios.isdisjoint(_FRESH_CLEAN_SEEDS)
+    assert used_by_make_scenarios.isdisjoint(_FRESH_SCANNER_SEEDS)
+
+    for seed in _FRESH_CLEAN_SEEDS:
+        df, _manifest = generate(GeneratorConfig(seed=seed, flaws=Flaws(split_strategy="patient")))
+        flagged = [sg for sg in check_subgroup_degradation(df) if sg["flagged"]]
+        assert flagged == []
+
+    degradation = SubgroupDegradation("machine_id", ["M030"], target_auc=0.62)
+    for seed in _FRESH_SCANNER_SEEDS:
+        df, _manifest = generate(
+            GeneratorConfig(
+                seed=seed,
+                flaws=Flaws(split_strategy="patient", subgroup_degradations=[degradation]),
+            )
+        )
+        subgroups = check_subgroup_degradation(df)
+        assert any(
+            sg["key"] == "machine_id" and sg["value"] == "M030" and sg["flagged"] for sg in subgroups
+        )
 
 
 # --- Check 2: split-quality audit ----------------------------------------

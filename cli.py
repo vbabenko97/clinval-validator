@@ -1,10 +1,9 @@
 """Command-line entrypoint: validate a predictions CSV and print the risk report.
 
 Wires the two layers: load predictions -> run the deterministic validators ->
-assemble the report payload -> hand it to the reporter -> print the report. The
-compute logic lives in ``clinval_validators`` and runs offline; ``reporter`` is the
-only part that needs the network, so without an API key the validators still run and
-their JSON is printed.
+hand the payload to the reporter -> print the report. The compute logic lives in
+``clinval_validators`` and runs offline; ``reporter`` is the only part that needs
+the network, so without an API key the validators still run and their JSON is printed.
 """
 
 from __future__ import annotations
@@ -17,13 +16,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from reporter import API_KEY_ENV, MissingAPIKeyError, render_report, render_reviewer_critique
-from clinval_validators import (
-    ReportPayload,
-    audit_split_quality,
-    check_patient_leakage,
-    check_subgroup_degradation,
-    compute_pooled_metric,
+from clinval_validators import run_checks, validate_predictions
+from reporter import (
+    API_KEY_ENV,
+    MissingAPIKeyError,
+    ReportNotRenderedError,
+    render_report,
+    render_reviewer_critique,
 )
 
 
@@ -53,20 +52,14 @@ def _load_predictions(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def _assemble_payload(df: pd.DataFrame) -> ReportPayload:
-    """Run every validator and assemble the report JSON contract."""
-    return {
-        "leakage": check_patient_leakage(df),
-        "split_audit": audit_split_quality(df),
-        "subgroups": check_subgroup_degradation(df),
-        "pooled_metric": compute_pooled_metric(df),
-    }
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     df = _load_predictions(args.predictions)
-    payload = _assemble_payload(df)
+    problems = validate_predictions(df)
+    if problems:
+        print("\n".join(problems), file=sys.stderr)
+        return 2
+    payload = run_checks(df)
     render = render_reviewer_critique if args.mode == "critique" else render_report
     try:
         print(render(payload))
@@ -77,6 +70,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{API_KEY_ENV} is not set, so the {args.mode} report was not rendered.\n"
             f"Set a key to add Claude's narration:\n"
             f"    export {API_KEY_ENV}=sk-ant-...",
+            file=sys.stderr,
+        )
+        return 1
+    except ReportNotRenderedError as exc:
+        print(json.dumps(payload, indent=2))
+        print(
+            f"\nThe deterministic checks above ran offline and are complete.\n"
+            f"{exc} The {args.mode} report was not rendered.",
             file=sys.stderr,
         )
         return 1

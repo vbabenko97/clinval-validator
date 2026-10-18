@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Spine of the 3-minute demo: a GREEN control, then the leakage scenario.
-# Requires ANTHROPIC_API_KEY (the report step calls claude-opus-4-8).
+# Requires ANTHROPIC_API_KEY (the report step calls Claude; see MODEL in reporter/report.py).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,5 +20,5 @@ run() {
   echo
 }
 
-run clean_patient_grouped "expect GREEN — no leakage, no degraded subgroup"
-run weak_random_split_leakage "expect a leakage flag: 940 shared train/test patients"
+run clean_patient_grouped "expect GREEN — no leakage, no flagged subgroup"
+run optimistic_site_shortcut "expect RED — 990 patients in both train and test"

@@ -1,3 +1,5 @@
+Hackathon planning snapshot (July 2026). Not maintained; current status is in README.md.
+
 # PROJECT_PLAN — clinval-validator
 
 ## Problem statement
@@ -91,7 +93,7 @@ All AUCs via scikit-learn `roc_auc_score`. Grouping via pandas. No LLM.
 
 The reporter sends the assembled `ReportPayload` (JSON) to `claude-opus-4-8`
 under the reviewer system prompt at
-[`prompts/opus-4-8/reporter_system_prompt.md`](prompts/opus-4-8/reporter_system_prompt.md),
+[`prompts/opus-4-8/reporter_system_prompt.md`](../../prompts/opus-4-8/reporter_system_prompt.md),
 loaded from disk (never duplicated inline). That prompt pins the output: an
 Overall risk line (GREEN/YELLOW/RED), What the data shows, What can be claimed,
 What cannot be claimed, and the Next validation step — every figure drawn only

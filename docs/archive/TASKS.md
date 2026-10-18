@@ -1,3 +1,5 @@
+Hackathon planning snapshot (July 2026). Not maintained; current status is in README.md.
+
 # TASKS — clinval-validator
 
 Every item names a concrete artifact. Phases match CLAUDE.md — Phase 1 is
@@ -50,7 +52,7 @@ complete; Phase 2 items are optional and started only now that Phase 1 is done.
 - [x] `demo/run_demo.sh` — scripted path over `clean_patient_grouped` then `weak_random_split_leakage`.
 - [x] `README.md` — verified run commands and a sample-output snippet (real deterministic JSON + illustrative report).
 - [x] Fresh-clone reproducibility: `pip install -e .[dev]` on Python 3.11+ → `python -m pytest` green (28 tests) → `clinval-validate` runs.
-- [ ] Record the <3-minute demo video (naive → grouped collapse → Claude explains → next step). Script: [docs/DEMO.md](docs/DEMO.md). **Owner: user.**
+- [ ] Record the <3-minute demo video (naive → grouped collapse → Claude explains → next step). Script: [docs/DEMO.md](../DEMO.md). **Owner: user.**
 
 ## Phase 2 — Stretch (Phase 1 is done; these are optional)
 

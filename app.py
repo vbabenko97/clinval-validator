@@ -17,15 +17,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from cli import _assemble_payload
-from reporter import API_KEY_ENV, render_report, render_reviewer_critique
+from clinval_validators import run_checks, validate_predictions
+from reporter import (
+    API_KEY_ENV,
+    MODEL,
+    ReportNotRenderedError,
+    render_report,
+    render_reviewer_critique,
+)
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "claude-science-artifacts" / "scenarios"
-
-# The columns every validator needs. Checked at the upload boundary: an uploaded
-# file is the one input this tool does not control, so a missing column must
-# produce a readable message rather than a raw KeyError traceback.
-REQUIRED_COLUMNS = ("patient_id", "machine_id", "site_id", "y_true", "y_prob", "split")
 
 
 def available_scenarios() -> dict[str, Path]:
@@ -33,9 +34,9 @@ def available_scenarios() -> dict[str, Path]:
     return {p.stem: p for p in sorted(SCENARIOS_DIR.glob("*.csv")) if not p.name.startswith("_")}
 
 
-def missing_columns(df: pd.DataFrame) -> list[str]:
-    """Return the required columns absent from ``df``; empty when the schema fits."""
-    return sorted(set(REQUIRED_COLUMNS) - set(df.columns))
+def _run_checks(df: pd.DataFrame):
+    """Streamlit-cacheable wrapper. The cache lives on this function, not on a session."""
+    return run_checks(df)
 
 
 def main() -> None:
@@ -67,24 +68,24 @@ def main() -> None:
 
         st.header("Claude report")
         mode = st.radio("Mode", ["risk", "critique"], format_func=str.capitalize)
+        # The field starts empty: a widget's value is sent to the browser, so
+        # prefilling it would hand the server's key to every visitor.
         api_key = st.text_input(
-            "Anthropic API key", value=os.environ.get(API_KEY_ENV, ""), type="password"
+            "Anthropic API key",
+            type="password",
+            help=f"Leave empty to use {API_KEY_ENV} from the server environment.",
         )
         generate = st.button("Generate with Claude", type="primary")
 
-    absent = missing_columns(df)
-    if absent:
-        st.error(
-            f"This CSV is missing required column(s): {', '.join(absent)}. "
-            f"A predictions table needs: {', '.join(REQUIRED_COLUMNS)}. "
-            "See the README for the expected schema.",
-            icon="🚫",
-        )
+    problems = validate_predictions(df)
+    if problems:
+        st.error("\n\n".join(problems), icon="🚫")
         st.stop()
 
-    payload = _assemble_payload(df)
+    payload = st.cache_data(_run_checks)(df)
     leakage = payload["leakage"]
-    flagged = [s for s in payload["subgroups"] if s["flagged"]]
+    level = payload["risk"]["level"]
+    reasons = " ".join(payload["risk"]["reasons"])
 
     left, right = st.columns(2)
 
@@ -94,28 +95,36 @@ def main() -> None:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Leaked patients", leakage["overlapping_patient_ids"])
         c2.metric("Leakage rate", f"{leakage['leakage_rate']:.1%}")
-        # The only like-for-like pair: one fixed y_prob, two evaluation populations.
-        # Labels stay split-agnostic because an uploaded file may already be grouped.
-        c3.metric("AUC, test split as given", f"{audit['random_split']:.3f}")
+        # Same fixed predictions. The sample draws patients from every row,
+        # including training rows, so it is not a second look at the test split.
+        c3.metric("AUC, test split as given", f"{audit['test_split_as_given']:.3f}")
+        # A small table can draw a one-class sample; the audit then reports None.
+        sample = audit["patient_disjoint_sample"]
         c4.metric(
-            "AUC, patient-disjoint subset",
-            f"{audit['grouped_split']:.3f}",
-            delta=f"{audit['grouped_split'] - audit['random_split']:+.3f}",
+            "AUC, patient-disjoint sample",
+            "n/a (one class)" if sample is None else f"{sample:.3f}",
+            delta=None if sample is None else f"{sample - audit['test_split_as_given']:+.3f}",
+        )
+        range95 = audit["sample_range95"]
+        range_text = (
+            ""
+            if range95 is None
+            else f"Over the seeds 0–199 whose sample holds both classes, that sample "
+            f"AUC stays within {range95[0]:.3f}–{range95[1]:.3f}. "
         )
         st.caption(
-            "No retraining — only the evaluation population changes. "
+            "Both AUCs use the same fixed predictions. The patient-disjoint "
+            "sample is drawn from all rows, including training rows, so this "
+            "comparison cannot measure how much leakage inflated the metric. "
+            f"{range_text}"
             "Pooled AUC and the per-subgroup breakdown are in the JSON below."
         )
-        if leakage["overlapping_patient_ids"]:
-            st.error(
-                f"{leakage['overlapping_patient_ids']} patients appear in both "
-                "train and test — the split is not leakage-safe.",
-                icon="🚫",
-            )
-        elif flagged:
-            st.warning(f"{len(flagged)} subgroup(s) flagged below pooled AUC.", icon="⚠️")
+        if level == "RED":
+            st.error(f"{level}. {reasons}", icon="🚫")
+        elif level == "YELLOW":
+            st.warning(f"{level}. {reasons}", icon="⚠️")
         else:
-            st.success("No leakage and no subgroup flags.", icon="✅")
+            st.success(f"{level}. {reasons}", icon="✅")
         st.caption("Payload sent to Claude (every number is computed here, not by the model):")
         st.json(payload)
         st.download_button(
@@ -132,14 +141,17 @@ def main() -> None:
         report_key = f"{mode}:{json.dumps(payload, sort_keys=True)}"
         cached = st.session_state.get("report")
 
-        if generate and not api_key:
+        if generate and not (api_key or os.environ.get(API_KEY_ENV)):
             st.warning("Set an Anthropic API key to render the report.", icon="🔑")
         elif generate:
-            os.environ[API_KEY_ENV] = api_key
             render = render_reviewer_critique if mode == "critique" else render_report
-            with st.spinner(f"Asking claude-opus-4-8 for the {mode} report…"):
-                cached = (report_key, render(payload))
-            st.session_state["report"] = cached
+            try:
+                with st.spinner(f"Asking {MODEL} for the {mode} report…"):
+                    # None makes the reporter read the server's ANTHROPIC_API_KEY.
+                    cached = (report_key, render(payload, api_key=api_key or None))
+                st.session_state["report"] = cached
+            except ReportNotRenderedError as exc:
+                st.error(f"{exc} The deterministic payload on the left is complete.", icon="🚫")
 
         if cached and cached[0] == report_key:
             st.markdown(cached[1])

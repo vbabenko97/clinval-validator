@@ -19,8 +19,9 @@ env/
 # Local Claude/Codex tooling (vendored skills/agents/config — not hackathon work)
 .claude/
 .codex/
+.agents/
 
-# Generator default output (fixtures live in claude-science-artifcats/scenarios/ and ARE committed)
+# Generator default output (fixtures live in claude-science-artifacts/scenarios/ and ARE committed)
 /predictions.csv
 
 # Real RSNA-SMBC data — the license bans redistribution "in any form". Never commit
@@ -33,3 +34,6 @@ predictions_rsna*.csv
 
 # OS
 .DS_Store
+
+screenshots/
+.mcp.json

@@ -1,23 +1,7 @@
 # data/
 
-No fixtures are copied or regenerated here. The validators read directly from
-the labeled scenario suite that already exists in
-[`claude-science-artifacts/scenarios/`](../claude-science-artifacts/scenarios/),
-which is the validators' ground-truth test oracle.
+This folder contains this README. A local `data/rsna/` directory may hold `train.csv` from the Radiological Society of North America (RSNA) Screening Mammography Breast Cancer Detection dataset. That directory is gitignored. The RSNA license bans redistribution, so the raw table is not in the repository.
 
-Each scenario ships a `*.csv`, a `*.manifest.json` (injected flaws +
-`expected_detections`), and is indexed in `_scenario_summary.csv`.
+The fixtures the validators read are in [`claude-science-artifacts/scenarios/`](../claude-science-artifacts/scenarios/). Each scenario is a `*.csv` plus a `*.manifest.json`.
 
-## Demo scenario
-
-The demo runs on **`weak_random_split_leakage`** — a random split with a known
-940 train/test patient overlap and pooled AUC 0.8425. It exercises the two
-headline checks (patient leakage + split-quality gap) in one table.
-
-Contrast scenarios for the demo narrative:
-
-- `clean_patient_grouped` — negative control; every check should pass (GREEN).
-- `optimistic_site_shortcut` — inflated AUC 0.9647 under a leaking random split;
-  the "looks great until you group the split" escalation.
-
-Synthetic / public-schema data only. No PHI. Never commit real patient data.
+The demo in [docs/DEMO.md](../docs/DEMO.md) uses `optimistic_site_shortcut`.

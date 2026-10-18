@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -17,13 +18,38 @@ from reporter import (
     render_reviewer_critique,
 )
 
+# leakage_rate is 940 / 959 on weak_random_split_leakage. The other fields match
+# the current payload contract; this dict is a stub, not a full scenario dump.
 SAMPLE_PAYLOAD = {
-    "leakage": {"overlapping_patient_ids": 940, "leakage_rate": 0.4702},
-    "split_audit": {"metric": "auc", "random_split": 0.8273, "grouped_split": 0.8994, "gap": -0.0721},
+    "leakage": {"overlapping_patient_ids": 940, "leakage_rate": 0.9802},
+    "split_audit": {
+        "metric": "auc",
+        "test_split_as_given": 0.8273,
+        "patient_disjoint_sample": 0.8994,
+        "sample_range95": [0.7523, 0.9336],
+        "gap": -0.0721,
+    },
     "subgroups": [
-        {"key": "machine_id", "value": "M030", "n": 1048, "auc": 0.6243, "delta_vs_pooled": -0.21, "flagged": True}
+        {
+            "key": "machine_id",
+            "value": "M031",
+            "n": 1020,
+            "auc": 0.8075,
+            "auc_rest": 0.8490,
+            "delta_vs_rest": -0.0415,
+            "delta_ci95": [-0.1702, 0.0521],
+            "mean_predicted": 0.5111,
+            "observed_rate": 0.0216,
+            "flagged": False,
+        }
     ],
     "pooled_metric": {"name": "auc", "value": 0.8425},
+    "risk": {
+        "level": "RED",
+        "reasons": [
+            "940 patients appear in both the train and test splits (leakage rate 98.0%)."
+        ],
+    },
 }
 
 
@@ -76,6 +102,29 @@ def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
     # The operative reviewer prompt is sent, not the file's Markdown doc header.
     assert "senior clinical-AI validation reviewer" in captured["system"]
     assert "# Reporter system prompt" not in captured["system"]
+
+
+def test_api_key_argument_reaches_the_client_without_changing_the_environment(monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "env-key")
+    captured: dict = {}
+
+    class FakeMessages:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(content=[SimpleNamespace(text="ok")])
+
+    class FakeAnthropic:
+        def __init__(self, api_key=None):
+            captured["api_key"] = api_key
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
+
+    assert render_report(SAMPLE_PAYLOAD, api_key="input-key") == "ok"
+    assert captured["api_key"] == "input-key"
+    assert render_reviewer_critique(SAMPLE_PAYLOAD, api_key="critique-key") == "ok"
+    assert captured["api_key"] == "critique-key"
+    assert os.environ["ANTHROPIC_API_KEY"] == "env-key"
 
 
 def test_render_report_raises_a_named_error_when_the_key_is_absent(monkeypatch) -> None:

@@ -55,18 +55,24 @@ def _load_system_prompt(path: Path) -> str:
     return text.split("---", 1)[1].strip()
 
 
-def _render(payload: ReportPayload, system_prompt_path: Path) -> str:
+def _render(
+    payload: ReportPayload, system_prompt_path: Path, api_key: str | None = None
+) -> str:
     """Send the deterministic payload to ``claude-opus-4-8`` under one prompt.
 
-    Reads the Anthropic API key from the ``ANTHROPIC_API_KEY`` environment
-    variable, loads the operative system prompt from ``system_prompt_path``, sends
-    the payload as JSON, and returns the model's text. The key is never
-    hard-coded, and no number is computed here — every figure comes from the JSON.
+    ``api_key`` overrides ``ANTHROPIC_API_KEY`` when it is passed, so a browser
+    session can use the key typed into that session without writing
+    ``os.environ``. The key is never hard-coded, and no number is computed here.
     """
-    try:
-        api_key = os.environ[API_KEY_ENV]
-    except KeyError as exc:
-        raise MissingAPIKeyError(f"{API_KEY_ENV} is not set in the environment.") from exc
+    if api_key is None:
+        try:
+            api_key = os.environ[API_KEY_ENV]
+        except KeyError as exc:
+            raise MissingAPIKeyError(
+                f"{API_KEY_ENV} is not set in the environment."
+            ) from exc
+    if not api_key:
+        raise MissingAPIKeyError(f"{API_KEY_ENV} is not set in the environment.")
 
     client = Anthropic(api_key=api_key)
     message = client.messages.create(
@@ -78,11 +84,11 @@ def _render(payload: ReportPayload, system_prompt_path: Path) -> str:
     return message.content[0].text
 
 
-def render_report(payload: ReportPayload) -> str:
+def render_report(payload: ReportPayload, api_key: str | None = None) -> str:
     """Render the GREEN/YELLOW/RED Validation Risk Report from the payload."""
-    return _render(payload, SYSTEM_PROMPT_PATH)
+    return _render(payload, SYSTEM_PROMPT_PATH, api_key)
 
 
-def render_reviewer_critique(payload: ReportPayload) -> str:
+def render_reviewer_critique(payload: ReportPayload, api_key: str | None = None) -> str:
     """Render a journal-reviewer critique plus a corrected Methods paragraph."""
-    return _render(payload, CRITIQUE_SYSTEM_PROMPT_PATH)
+    return _render(payload, CRITIQUE_SYSTEM_PROMPT_PATH, api_key)

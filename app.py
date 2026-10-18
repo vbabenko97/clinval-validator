@@ -126,10 +126,9 @@ def main() -> None:
         if generate and not api_key:
             st.warning("Set an Anthropic API key to render the report.", icon="🔑")
         elif generate:
-            os.environ[API_KEY_ENV] = api_key
             render = render_reviewer_critique if mode == "critique" else render_report
             with st.spinner(f"Asking claude-opus-4-8 for the {mode} report…"):
-                cached = (report_key, render(payload))
+                cached = (report_key, render(payload, api_key=api_key))
             st.session_state["report"] = cached
 
         if cached and cached[0] == report_key:

@@ -56,6 +56,7 @@ python claude-science-artifacts/leakage_generator.py --out predictions.csv \
 - `leakage_generator.generate` draws `y_prob` before it assigns splits, so injected leakage does not change the scores.
 - `_FLAG_DELTA` (−0.10) and `_MIN_SUBGROUP_N` (50) were calibrated on the committed fixtures. Do not change them to make a test pass.
 - `reporter/report.py` sends only the text after the first `---` of a prompt file.
+- A one-sided Bonferroni correction across subgroups was measured on generator seeds 7–36 and not adopted. It cut clean-table flags from 6 to 3 of 30, but M030 detection fell from 26 to 21 of 30 and density detection from 21 to 12 of 30, and `subgroup_density_degradation` was no longer flagged. Re-measure on the same seeds before changing the flag rule.
 
 ## Data & schema
 

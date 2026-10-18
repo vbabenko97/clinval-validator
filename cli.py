@@ -24,6 +24,7 @@ from clinval_validators import (
     check_patient_leakage,
     check_subgroup_degradation,
     compute_pooled_metric,
+    validate_predictions,
 )
 
 
@@ -66,6 +67,10 @@ def _assemble_payload(df: pd.DataFrame) -> ReportPayload:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     df = _load_predictions(args.predictions)
+    problems = validate_predictions(df)
+    if problems:
+        print("\n".join(problems), file=sys.stderr)
+        return 2
     payload = _assemble_payload(df)
     render = render_reviewer_critique if args.mode == "critique" else render_report
     try:

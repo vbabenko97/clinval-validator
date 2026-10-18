@@ -10,6 +10,7 @@ from .checks import (
     check_patient_leakage,
     check_subgroup_degradation,
     compute_pooled_metric,
+    validate_predictions,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "check_patient_leakage",
     "check_subgroup_degradation",
     "compute_pooled_metric",
+    "validate_predictions",
 ]

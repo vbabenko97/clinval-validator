@@ -7,13 +7,11 @@ report JSON contract that ``reporter`` consumes, and none of them call an LLM.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
+import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
-
-if TYPE_CHECKING:
-    import pandas as pd
 
 # Subgroup flag thresholds, calibrated against the labeled scenarios: M030 in
 # subgroup_scanner_degradation sits 0.21 below pooled and must flag, while every
@@ -21,12 +19,16 @@ if TYPE_CHECKING:
 _FLAG_DELTA = -0.10
 _MIN_SUBGROUP_N = 50
 
+# Columns the checks read by name. Anything else in the table is ignored.
+_REQUIRED_COLUMNS = ("patient_id", "machine_id", "site_id", "y_true", "y_prob", "split")
+
 __all__ = [
     "LeakageResult",
     "SplitAuditResult",
     "SubgroupResult",
     "PooledMetric",
     "ReportPayload",
+    "validate_predictions",
     "check_patient_leakage",
     "audit_split_quality",
     "check_subgroup_degradation",
@@ -74,6 +76,45 @@ class ReportPayload(TypedDict):
 
 
 # --- Checks ---------------------------------------------------------------
+
+
+def validate_predictions(df: pd.DataFrame) -> list[str]:
+    """Return readable problems with a predictions table.
+
+    An empty list means the deterministic checks can run. Called at the CLI
+    and upload boundary, which is the one input this tool does not control.
+    A missing column stops the remaining checks, because they read columns by
+    name.
+    """
+    missing = [column for column in _REQUIRED_COLUMNS if column not in df.columns]
+    if missing:
+        needed = ", ".join(_REQUIRED_COLUMNS)
+        return [
+            "Missing required column(s): "
+            + ", ".join(missing)
+            + f". A predictions table needs {needed}."
+        ]
+
+    problems: list[str] = []
+    if not (df["split"] == "train").any():
+        problems.append('No rows with split == "train".')
+    if not (df["split"] == "test").any():
+        problems.append('No rows with split == "test".')
+
+    y_true = pd.to_numeric(df["y_true"], errors="coerce")
+    if y_true.isna().any() or not y_true.dropna().isin([0, 1]).all():
+        problems.append("y_true has values outside {0, 1}.")
+
+    test_y = y_true[df["split"] == "test"]
+    if len(test_y) and not ((test_y == 0).any() and (test_y == 1).any()):
+        problems.append("Test rows do not contain both classes (0 and 1).")
+
+    y_prob = pd.to_numeric(df["y_prob"], errors="coerce")
+    if y_prob.isna().any():
+        problems.append("y_prob is not numeric.")
+    if (y_prob.notna() & ((y_prob < 0) | (y_prob > 1))).any():
+        problems.append("y_prob has values outside [0, 1].")
+    return problems
 
 
 def check_patient_leakage(df: pd.DataFrame) -> LeakageResult:

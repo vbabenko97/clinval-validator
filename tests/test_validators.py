@@ -13,6 +13,7 @@ from clinval_validators import (  # noqa: E402
     check_patient_leakage,
     check_subgroup_degradation,
     compute_pooled_metric,
+    validate_predictions,
 )
 
 SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "claude-science-artifacts" / "scenarios"
@@ -20,6 +21,69 @@ SCENARIOS_DIR = Path(__file__).resolve().parent.parent / "claude-science-artifac
 
 def _load(scenario: str) -> pd.DataFrame:
     return pd.read_csv(SCENARIOS_DIR / f"{scenario}.csv")
+
+
+def _valid_frame() -> pd.DataFrame:
+    """Small table that satisfies every boundary check."""
+    return pd.DataFrame(
+        {
+            "patient_id": ["P1", "P1", "P2", "P2"],
+            "machine_id": ["M010", "M010", "M020", "M020"],
+            "site_id": ["S01", "S01", "S02", "S02"],
+            "y_true": [0, 1, 0, 1],
+            "y_prob": [0.0, 1.0, 0.3, 0.7],
+            "split": ["train", "train", "test", "test"],
+        }
+    )
+
+
+# --- Input boundary ------------------------------------------------------
+
+
+def test_validate_predictions_accepts_a_clean_fixture() -> None:
+    assert validate_predictions(_load("clean_patient_grouped")) == []
+    assert validate_predictions(_valid_frame()) == []
+
+
+def test_validate_predictions_reports_missing_columns() -> None:
+    df = _valid_frame().drop(columns=["machine_id", "split"])
+    problems = validate_predictions(df)
+    assert len(problems) == 1
+    assert "machine_id" in problems[0]
+    assert "split" in problems[0]
+
+
+def test_validate_predictions_reports_a_missing_train_or_test_split() -> None:
+    df = _valid_frame()
+    df["split"] = "val"
+    problems = validate_predictions(df)
+    assert any('split == "train"' in problem for problem in problems)
+    assert any('split == "test"' in problem for problem in problems)
+
+
+def test_validate_predictions_reports_y_true_outside_0_1() -> None:
+    df = _valid_frame()
+    df.loc[0, "y_true"] = 2
+    assert validate_predictions(df) == ["y_true has values outside {0, 1}."]
+
+
+def test_validate_predictions_reports_test_rows_without_both_classes() -> None:
+    df = _valid_frame()
+    df.loc[df["split"] == "test", "y_true"] = 0
+    assert validate_predictions(df) == ["Test rows do not contain both classes (0 and 1)."]
+
+
+def test_validate_predictions_reports_non_numeric_y_prob() -> None:
+    df = _valid_frame()
+    df["y_prob"] = df["y_prob"].astype(object)
+    df.loc[0, "y_prob"] = "high"
+    assert validate_predictions(df) == ["y_prob is not numeric."]
+
+
+def test_validate_predictions_reports_y_prob_outside_0_1() -> None:
+    df = _valid_frame()
+    df.loc[0, "y_prob"] = 1.2
+    assert validate_predictions(df) == ["y_prob has values outside [0, 1]."]
 
 
 # --- Check 1: patient-level leakage --------------------------------------

@@ -16,6 +16,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO_CSV = REPO_ROOT / "claude-science-artifacts" / "scenarios" / "weak_random_split_leakage.csv"
 
 
+def test_cli_rejects_an_invalid_table(tmp_path: Path, capsys) -> None:
+    path = tmp_path / "bad.csv"
+    path.write_text("patient_id,y_true,y_prob\n1,0,0.2\n", encoding="utf-8")
+    exit_code = cli.main(["--predictions", str(path)])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "Missing required column" in captured.err
+    assert "machine_id" in captured.err
+    assert "Traceback" not in captured.err
+
+
 def test_load_predictions_reads_the_table() -> None:
     df = _load_predictions(DEMO_CSV)
     assert len(df) == 8342

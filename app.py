@@ -18,24 +18,15 @@ from pathlib import Path
 import pandas as pd
 
 from cli import _assemble_payload
+from clinval_validators import validate_predictions
 from reporter import API_KEY_ENV, render_report, render_reviewer_critique
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "claude-science-artifacts" / "scenarios"
-
-# The columns every validator needs. Checked at the upload boundary: an uploaded
-# file is the one input this tool does not control, so a missing column must
-# produce a readable message rather than a raw KeyError traceback.
-REQUIRED_COLUMNS = ("patient_id", "machine_id", "site_id", "y_true", "y_prob", "split")
 
 
 def available_scenarios() -> dict[str, Path]:
     """Map each bundled scenario name to its predictions CSV (excludes the summary)."""
     return {p.stem: p for p in sorted(SCENARIOS_DIR.glob("*.csv")) if not p.name.startswith("_")}
-
-
-def missing_columns(df: pd.DataFrame) -> list[str]:
-    """Return the required columns absent from ``df``; empty when the schema fits."""
-    return sorted(set(REQUIRED_COLUMNS) - set(df.columns))
 
 
 def main() -> None:
@@ -72,14 +63,9 @@ def main() -> None:
         )
         generate = st.button("Generate with Claude", type="primary")
 
-    absent = missing_columns(df)
-    if absent:
-        st.error(
-            f"This CSV is missing required column(s): {', '.join(absent)}. "
-            f"A predictions table needs: {', '.join(REQUIRED_COLUMNS)}. "
-            "See the README for the expected schema.",
-            icon="🚫",
-        )
+    problems = validate_predictions(df)
+    if problems:
+        st.error("\n\n".join(problems), icon="🚫")
         st.stop()
 
     payload = _assemble_payload(df)

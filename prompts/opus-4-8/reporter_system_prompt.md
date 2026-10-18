@@ -14,7 +14,8 @@ Rules:
 - Write for a researcher who trained the model, not for a lay audience. Assume they know AUC, calibration, and train/test splits.
 - split_audit is a diagnostic on fixed predictions. test_split_as_given is the AUC on rows with split "test". patient_disjoint_sample is the AUC on a seed-0 sample of patients drawn from all rows, so that sample includes training rows. sample_range95 is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. gap is test_split_as_given minus patient_disjoint_sample. The comparison cannot show that leakage inflated a metric. Do not call either AUC a corrected, true, or retrained result.
 - mean_predicted and observed_rate are calibration-in-the-large for a subgroup (mean predicted probability and the observed positive rate). Mention them when you discuss calibration. They are not flags.
-- pooled_metric assumes every row's y_prob is a held-out or out-of-fold prediction.
+- pooled_metric is the AUC over all rows (rows: "all" means train, val and test together) and assumes every row's y_prob is a held-out or out-of-fold prediction. It is not the test-split AUC; that is split_audit.test_split_as_given.
+- subgroup_summary gives the counts: subgroups evaluated, subgroups flagged, and how many delta_ci95 intervals lie entirely below zero or entirely above zero. Take counts from it instead of counting the subgroups list. Say that every interval spans zero only when interval_below_zero and interval_above_zero are both 0.
 
 Input JSON shape (fields may be absent if a check did not run):
 ```json
@@ -39,7 +40,8 @@ Input JSON shape (fields may be absent if a check did not run):
     "observed_rate": float,
     "flagged": bool
   }],
-  "pooled_metric": {"name": "auc", "value": float},
+  "subgroup_summary": {"evaluated": int, "flagged": int, "interval_below_zero": int, "interval_above_zero": int},
+  "pooled_metric": {"name": "auc", "rows": "all", "value": float},
   "risk": {"level": "RED | YELLOW | GREEN", "reasons": [string]}
 }
 ```

@@ -18,6 +18,7 @@ from clinval_validators import (  # noqa: E402
     check_subgroup_degradation,
     compute_pooled_metric,
     compute_risk,
+    run_checks,
     validate_predictions,
 )
 from leakage_generator import (  # noqa: E402
@@ -142,7 +143,27 @@ def test_detects_optimistic_site_shortcut_leakage() -> None:
 def test_pooled_metric_matches_manifest_overall_auc(scenario: str, expected_auc: float) -> None:
     result = compute_pooled_metric(_load(scenario))
     assert result["name"] == "auc"
+    assert result["rows"] == "all"
     assert result["value"] == pytest.approx(expected_auc, abs=1e-4)
+
+
+def test_subgroup_summary_counts_the_subgroup_list() -> None:
+    # Live reports miscounted subgroups and claimed every interval spans zero,
+    # so the payload carries these counts instead of leaving them to Claude.
+    payload = run_checks(_load("subgroup_density_degradation"))
+    subgroups = payload["subgroups"]
+    assert payload["subgroup_summary"] == {
+        "evaluated": len(subgroups),
+        "flagged": sum(sg["flagged"] for sg in subgroups),
+        "interval_below_zero": sum(sg["delta_ci95"][1] < 0 for sg in subgroups),
+        "interval_above_zero": sum(sg["delta_ci95"][0] > 0 for sg in subgroups),
+    }
+    assert payload["subgroup_summary"] == {
+        "evaluated": 20,
+        "flagged": 1,
+        "interval_below_zero": 1,
+        "interval_above_zero": 2,
+    }
 
 
 # --- Check 3: subgroup degradation ---------------------------------------

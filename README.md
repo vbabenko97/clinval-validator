@@ -30,6 +30,8 @@ On 30 tables from the bundled generator (seeds 7–36; 2,000 patients and about 
 
 `mean_predicted` (mean `y_prob`) and `observed_rate` (mean `y_true`) are calibration-in-the-large for that subgroup. They are reported and they do not flag. On `optimistic_site_shortcut`, mean `y_prob` by site runs from 0.331 to 0.754 while the observed positive rate runs from 0.97% to 2.3%.
 
+`subgroup_summary` counts the evaluated and flagged subgroups and the `delta_ci95` intervals that lie entirely below or entirely above zero. `pooled_metric.rows` is `"all"`: the pooled AUC covers train, val and test rows, so it is not the test-split AUC. Python supplies both because live reports from Claude miscounted subgroups and called the pooled AUC a test-set result.
+
 ## Split audit
 
 `test_split_as_given` is the AUC on rows with `split == "test"`. `patient_disjoint_sample` is the AUC on a seed-0 sample of 15% of patients drawn from every row, so the sample includes training rows. `sample_range95` is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. `gap` is `test_split_as_given` minus `patient_disjoint_sample`.
@@ -115,7 +117,13 @@ streamlit run app.py
       "flagged": false
     }
   ],
-  "pooled_metric": {"name": "auc", "value": 0.8424535490580416},
+  "subgroup_summary": {
+    "evaluated": 20,
+    "flagged": 0,
+    "interval_below_zero": 0,
+    "interval_above_zero": 1
+  },
+  "pooled_metric": {"name": "auc", "rows": "all", "value": 0.8424535490580416},
   "risk": {
     "level": "RED",
     "reasons": [

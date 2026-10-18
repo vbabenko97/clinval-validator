@@ -43,7 +43,13 @@ SAMPLE_PAYLOAD = {
             "flagged": False,
         }
     ],
-    "pooled_metric": {"name": "auc", "value": 0.8425},
+    "subgroup_summary": {
+        "evaluated": 20,
+        "flagged": 0,
+        "interval_below_zero": 0,
+        "interval_above_zero": 1,
+    },
+    "pooled_metric": {"name": "auc", "rows": "all", "value": 0.8425},
     "risk": {
         "level": "RED",
         "reasons": [
@@ -63,6 +69,9 @@ def test_prompts_name_the_fields_python_computes() -> None:
         "delta_ci95",
         "mean_predicted",
         "observed_rate",
+        "subgroup_summary",
+        "interval_below_zero",
+        "interval_above_zero",
         "risk",
         "reasons",
     )

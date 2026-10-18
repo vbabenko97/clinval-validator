@@ -37,10 +37,22 @@ def test_load_predictions_reads_the_table() -> None:
 
 def test_run_checks_matches_contract_and_is_json_serializable() -> None:
     payload = run_checks(_load_predictions(DEMO_CSV))
-    assert set(payload) == {"leakage", "split_audit", "subgroups", "pooled_metric", "risk"}
+    assert set(payload) == {
+        "leakage",
+        "split_audit",
+        "subgroups",
+        "subgroup_summary",
+        "pooled_metric",
+        "risk",
+    }
     assert payload["leakage"]["overlapping_patient_ids"] == 940
     assert payload["risk"]["level"] == "RED"
-    assert payload["pooled_metric"]["name"] == "auc"
+    assert payload["pooled_metric"] == {
+        "name": "auc",
+        "rows": "all",
+        "value": payload["pooled_metric"]["value"],
+    }
+    assert payload["subgroup_summary"]["evaluated"] == len(payload["subgroups"])
     assert isinstance(payload["subgroups"], list)
     # The reporter serializes the payload with json.dumps; guard that boundary.
     assert json.loads(json.dumps(payload)) == payload

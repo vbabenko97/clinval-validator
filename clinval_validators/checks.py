@@ -30,6 +30,7 @@ __all__ = [
     "LeakageResult",
     "SplitAuditResult",
     "SubgroupResult",
+    "SubgroupSummary",
     "PooledMetric",
     "ReportPayload",
     "validate_predictions",
@@ -73,8 +74,16 @@ class SubgroupResult(TypedDict):
     flagged: bool
 
 
+class SubgroupSummary(TypedDict):
+    evaluated: int
+    flagged: int
+    interval_below_zero: int
+    interval_above_zero: int
+
+
 class PooledMetric(TypedDict):
     name: str
+    rows: str
     value: float
 
 
@@ -87,6 +96,7 @@ class ReportPayload(TypedDict):
     leakage: LeakageResult
     split_audit: SplitAuditResult
     subgroups: list[SubgroupResult]
+    subgroup_summary: SubgroupSummary
     pooled_metric: PooledMetric
     risk: RiskResult
 
@@ -354,9 +364,25 @@ def compute_pooled_metric(df: pd.DataFrame) -> PooledMetric:
 
     Assumes every row's ``y_prob`` is a held-out or out-of-fold prediction.
     AUC is computed over the full table (not the test split alone) to match
-    each manifest's ``verification.overall_auc``.
+    each manifest's ``verification.overall_auc``. ``rows`` says so in the
+    payload, so the reporter does not present it as the test-split AUC.
     """
-    return {"name": "auc", "value": float(roc_auc_score(df["y_true"], df["y_prob"]))}
+    return {
+        "name": "auc",
+        "rows": "all",
+        "value": float(roc_auc_score(df["y_true"], df["y_prob"])),
+    }
+
+
+def _summarize_subgroups(subgroups: list[SubgroupResult]) -> SubgroupSummary:
+    """Counts the reporter would otherwise have to tally from the list itself."""
+    intervals = [sg["delta_ci95"] for sg in subgroups if sg["delta_ci95"] is not None]
+    return {
+        "evaluated": len(subgroups),
+        "flagged": sum(sg["flagged"] for sg in subgroups),
+        "interval_below_zero": sum(high < 0 for _, high in intervals),
+        "interval_above_zero": sum(low > 0 for low, _ in intervals),
+    }
 
 
 def compute_risk(leakage: LeakageResult, subgroups: list[SubgroupResult]) -> RiskResult:
@@ -409,6 +435,7 @@ def run_checks(df: pd.DataFrame) -> ReportPayload:
         "leakage": leakage,
         "split_audit": audit_split_quality(df),
         "subgroups": subgroups,
+        "subgroup_summary": _summarize_subgroups(subgroups),
         "pooled_metric": compute_pooled_metric(df),
         "risk": compute_risk(leakage, subgroups),
     }

@@ -36,3 +36,4 @@ predictions_rsna*.csv
 .DS_Store
 
 screenshots/
+.mcp.json

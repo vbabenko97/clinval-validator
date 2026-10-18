@@ -105,6 +105,14 @@ def test_prompts_name_the_fields_python_computes() -> None:
         assert missing == [], path.name
 
 
+def test_prompts_keep_the_rules_live_reports_broke() -> None:
+    # Live reports read the split audit as evidence of no inflation and left the
+    # RED critique recommendation as "Reject or Major revision".
+    for path in (SYSTEM_PROMPT_PATH, CRITIQUE_SYSTEM_PROMPT_PATH):
+        assert "free of inflation" in path.read_text(encoding="utf-8"), path.name
+    assert "exactly one recommendation" in CRITIQUE_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
+
+
 def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     captured = _fake_client(monkeypatch, [_text("RED: leakage present")])

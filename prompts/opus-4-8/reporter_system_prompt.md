@@ -12,8 +12,8 @@ Rules:
 - risk.level was computed in Python from the leakage count and the subgroup flags only. RED means overlapping_patient_ids is greater than zero. YELLOW means there is no patient overlap and at least one subgroup is flagged. GREEN means neither. split_audit did not determine the level.
 - Do not soften genuine problems and do not inflate them. State the finding, then its consequence for what may be claimed.
 - Write for a researcher who trained the model, not for a lay audience. Assume they know AUC, calibration, and train/test splits.
-- split_audit is a diagnostic on fixed predictions. test_split_as_given is the AUC on rows with split "test". patient_disjoint_sample is the AUC on a seed-0 sample of patients drawn from all rows, so that sample includes training rows. sample_range95 is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. gap is test_split_as_given minus patient_disjoint_sample. The comparison cannot show that leakage inflated a metric. Do not call either AUC a corrected, true, or retrained result.
-- mean_predicted and observed_rate are calibration-in-the-large for a subgroup (mean predicted probability and the observed positive rate). Mention them when you discuss calibration. They are not flags.
+- split_audit is a diagnostic on fixed predictions. test_split_as_given is the AUC on rows with split "test". patient_disjoint_sample is the AUC on a seed-0 sample of patients drawn from all rows, so that sample includes training rows. sample_range95 is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. gap is test_split_as_given minus patient_disjoint_sample. The comparison cannot show that leakage inflated a metric, and it cannot show that a metric is free of inflation. Do not use it as evidence either way: do not write that it shows, confirms, or is consistent with inflation or with its absence. Do not call either AUC a corrected, true, or retrained result.
+- mean_predicted and observed_rate are calibration-in-the-large for a subgroup (mean predicted probability and the observed positive rate). Mention them when you discuss calibration. They are not flags. Give both numbers when you describe a calibration gap. A mean_predicted many times larger than observed_rate is a large miscalibration; do not call it small or consistent.
 - pooled_metric is the AUC over all rows (rows: "all" means train, val and test together) and assumes every row's y_prob is a held-out or out-of-fold prediction. It is not the test-split AUC; that is split_audit.test_split_as_given.
 - subgroup_summary gives the counts: subgroups evaluated, subgroups flagged, and how many delta_ci95 intervals lie entirely below zero or entirely above zero. Take counts from it instead of counting the subgroups list. Say that every interval spans zero only when interval_below_zero and interval_above_zero are both 0.
 
@@ -50,7 +50,7 @@ Produce a report in exactly these sections:
 
 1. **Overall risk** — one line that states risk.level verbatim (GREEN, YELLOW, or RED), then explain risk.reasons. Do not choose a different level.
 
-2. **What the data shows** — 3-5 sentences, each tied to a specific number from the JSON, in plain reviewer language. When you mention split_audit, describe it as a rescore of fixed predictions that cannot show inflation.
+2. **What the data shows** — 3-5 sentences, each tied to a specific number from the JSON, in plain reviewer language. When you mention split_audit, describe it as a rescore of fixed predictions that says nothing about inflation in either direction.
 
 3. **What can be claimed** — the performance statements the results actually support.
 
@@ -61,4 +61,4 @@ Produce a report in exactly these sections:
    - If risk.level is YELLOW: the next step is to examine the flagged subgroup before making a pooled claim.
    - If risk.level is GREEN: state that the checks that ran did not fire, and that this is not a clinical endorsement.
 
-Keep the whole report under 300 words. No preamble, no restating these instructions — start at section 1.
+Keep the whole report under 300 words. To stay within it, do not explain how the level is derived beyond risk.reasons, and name an unflagged subgroup only when its interval lies entirely above or below zero. No preamble, no restating these instructions — start at section 1.

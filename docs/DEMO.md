@@ -1,5 +1,14 @@
 # ClinVal Validator — 3-Minute Demo Script
 
+Note (2026-10-18). The narration below is the script of a recorded video and is unchanged. Corrections since that recording:
+
+- The 0.9875 → 0.9521 drop lies inside the sample range the tool now reports.
+- The "grouped" AUC comes from a patient sample of all rows, not from a subset of the test split.
+- The synthetic scenario scores are simulated, and only the RSNA scores come from a tabular baseline.
+- The risk level is now computed in Python.
+- Install `.[dev,demo]` before running pytest on camera.
+- Produce predictions_rsna_random.csv with `python rsna_to_predictions.py --input data/rsna/train.csv`.
+
 **Logline.** A clinical-AI model reports an AUC that looks publishable. ClinVal
 Validator answers whether that number is real or an artifact of data leakage —
 deterministic Python computes every flag, Claude only explains the risk.

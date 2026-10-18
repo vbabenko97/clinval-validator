@@ -20,5 +20,5 @@ run() {
   echo
 }
 
-run clean_patient_grouped "expect GREEN — no leakage, no degraded subgroup"
-run weak_random_split_leakage "expect a leakage flag: 940 shared train/test patients"
+run clean_patient_grouped "expect GREEN — no leakage, no flagged subgroup"
+run optimistic_site_shortcut "expect RED — 990 patients in both train and test"

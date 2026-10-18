@@ -8,7 +8,14 @@ from types import SimpleNamespace
 import pytest
 
 import reporter
-from reporter import MODEL, MissingAPIKeyError, render_report, render_reviewer_critique
+from reporter import (
+    CRITIQUE_SYSTEM_PROMPT_PATH,
+    MODEL,
+    SYSTEM_PROMPT_PATH,
+    MissingAPIKeyError,
+    render_report,
+    render_reviewer_critique,
+)
 
 SAMPLE_PAYLOAD = {
     "leakage": {"overlapping_patient_ids": 940, "leakage_rate": 0.4702},
@@ -18,6 +25,25 @@ SAMPLE_PAYLOAD = {
     ],
     "pooled_metric": {"name": "auc", "value": 0.8425},
 }
+
+
+def test_prompts_name_the_fields_python_computes() -> None:
+    field_names = (
+        "test_split_as_given",
+        "patient_disjoint_sample",
+        "sample_range95",
+        "auc_rest",
+        "delta_vs_rest",
+        "delta_ci95",
+        "mean_predicted",
+        "observed_rate",
+        "risk",
+        "reasons",
+    )
+    for path in (SYSTEM_PROMPT_PATH, CRITIQUE_SYSTEM_PROMPT_PATH):
+        text = path.read_text(encoding="utf-8")
+        missing = [name for name in field_names if name not in text]
+        assert missing == [], path.name
 
 
 def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:

@@ -17,8 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from cli import _assemble_payload
-from clinval_validators import validate_predictions
+from clinval_validators import run_checks, validate_predictions
 from reporter import API_KEY_ENV, render_report, render_reviewer_critique
 
 SCENARIOS_DIR = Path(__file__).resolve().parent / "claude-science-artifacts" / "scenarios"
@@ -27,6 +26,11 @@ SCENARIOS_DIR = Path(__file__).resolve().parent / "claude-science-artifacts" / "
 def available_scenarios() -> dict[str, Path]:
     """Map each bundled scenario name to its predictions CSV (excludes the summary)."""
     return {p.stem: p for p in sorted(SCENARIOS_DIR.glob("*.csv")) if not p.name.startswith("_")}
+
+
+def _run_checks(df: pd.DataFrame):
+    """Streamlit-cacheable wrapper. The cache lives on this function, not on a session."""
+    return run_checks(df)
 
 
 def main() -> None:
@@ -68,9 +72,10 @@ def main() -> None:
         st.error("\n\n".join(problems), icon="🚫")
         st.stop()
 
-    payload = _assemble_payload(df)
+    payload = st.cache_data(_run_checks)(df)
     leakage = payload["leakage"]
-    flagged = [s for s in payload["subgroups"] if s["flagged"]]
+    level = payload["risk"]["level"]
+    reasons = " ".join(payload["risk"]["reasons"])
 
     left, right = st.columns(2)
 
@@ -96,16 +101,12 @@ def main() -> None:
             f"Over seeds 0–199 that sample AUC stays within {low:.3f}–{high:.3f}. "
             "Pooled AUC and the per-subgroup breakdown are in the JSON below."
         )
-        if leakage["overlapping_patient_ids"]:
-            st.error(
-                f"{leakage['overlapping_patient_ids']} patients appear in both "
-                "train and test — the split is not leakage-safe.",
-                icon="🚫",
-            )
-        elif flagged:
-            st.warning(f"{len(flagged)} subgroup(s) flagged below pooled AUC.", icon="⚠️")
+        if level == "RED":
+            st.error(f"{level}. {reasons}", icon="🚫")
+        elif level == "YELLOW":
+            st.warning(f"{level}. {reasons}", icon="⚠️")
         else:
-            st.success("No leakage and no subgroup flags.", icon="✅")
+            st.success(f"{level}. {reasons}", icon="✅")
         st.caption("Payload sent to Claude (every number is computed here, not by the model):")
         st.json(payload)
         st.download_button(

@@ -1,6 +1,6 @@
 """Streamlit demo app: the pure scenario-listing helper.
 
-The Streamlit UI itself is glue over already-tested functions (``_assemble_payload``
+The Streamlit UI itself is glue over already-tested functions (``run_checks``
 and the two reporters), so only the pure helper is unit-tested here. Importing
 ``app`` must not require Streamlit — it is imported lazily inside ``main``.
 The upload boundary is ``validate_predictions``, tested in ``test_validators``.

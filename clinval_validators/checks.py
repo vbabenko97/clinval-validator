@@ -7,7 +7,7 @@ report JSON contract that ``reporter`` consumes, and none of them call an LLM.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -37,6 +37,9 @@ __all__ = [
     "audit_split_quality",
     "check_subgroup_degradation",
     "compute_pooled_metric",
+    "compute_risk",
+    "run_checks",
+    "RiskResult",
 ]
 
 
@@ -75,11 +78,17 @@ class PooledMetric(TypedDict):
     value: float
 
 
+class RiskResult(TypedDict):
+    level: Literal["RED", "YELLOW", "GREEN"]
+    reasons: list[str]
+
+
 class ReportPayload(TypedDict):
     leakage: LeakageResult
     split_audit: SplitAuditResult
     subgroups: list[SubgroupResult]
     pooled_metric: PooledMetric
+    risk: RiskResult
 
 
 # --- Checks ---------------------------------------------------------------
@@ -348,3 +357,58 @@ def compute_pooled_metric(df: pd.DataFrame) -> PooledMetric:
     each manifest's ``verification.overall_auc``.
     """
     return {"name": "auc", "value": float(roc_auc_score(df["y_true"], df["y_prob"]))}
+
+
+def compute_risk(leakage: LeakageResult, subgroups: list[SubgroupResult]) -> RiskResult:
+    """Choose RED, YELLOW, or GREEN from leakage and subgroup flags.
+
+    RED when any patient is in both train and test. Otherwise YELLOW when
+    any subgroup is flagged. Otherwise GREEN. The split audit is not an
+    input: rescoring the same predictions cannot show inflation.
+    """
+    overlap = leakage["overlapping_patient_ids"]
+    if overlap > 0:
+        rate = leakage["leakage_rate"]
+        return {
+            "level": "RED",
+            "reasons": [
+                f"{overlap} patients appear in both the train and test splits "
+                f"(leakage rate {rate:.1%})."
+            ],
+        }
+
+    flagged = [subgroup for subgroup in subgroups if subgroup["flagged"]]
+    if flagged:
+        reasons: list[str] = []
+        for subgroup in flagged:
+            interval = subgroup["delta_ci95"]
+            if interval is None:
+                interval_text = "no bootstrap interval was available"
+            else:
+                interval_text = f"95% interval {interval[0]:+.3f} to {interval[1]:+.3f}"
+            reasons.append(
+                f"{subgroup['key']} {subgroup['value']} has AUC {subgroup['auc']:.3f} "
+                f"against {subgroup['auc_rest']:.3f} on the rest of the table "
+                f"(delta {subgroup['delta_vs_rest']:+.3f}, {interval_text})."
+            )
+        return {"level": "YELLOW", "reasons": reasons}
+
+    return {
+        "level": "GREEN",
+        "reasons": [
+            "No patient appears in both the train and test splits, and no subgroup is flagged."
+        ],
+    }
+
+
+def run_checks(df: pd.DataFrame) -> ReportPayload:
+    """Run every deterministic check and attach the risk level."""
+    leakage = check_patient_leakage(df)
+    subgroups = check_subgroup_degradation(df)
+    return {
+        "leakage": leakage,
+        "split_audit": audit_split_quality(df),
+        "subgroups": subgroups,
+        "pooled_metric": compute_pooled_metric(df),
+        "risk": compute_risk(leakage, subgroups),
+    }

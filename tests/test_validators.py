@@ -17,6 +17,7 @@ from clinval_validators import (  # noqa: E402
     check_patient_leakage,
     check_subgroup_degradation,
     compute_pooled_metric,
+    compute_risk,
     validate_predictions,
 )
 from leakage_generator import (  # noqa: E402
@@ -202,6 +203,24 @@ def test_subgroup_results_cover_machine_site_density_and_age(
     subgroups = subgroups_by_scenario["clean_patient_grouped"]
     assert {sg["key"] for sg in subgroups} == {"machine_id", "site_id", "density", "age"}
     assert "50-59" in {sg["value"] for sg in subgroups if sg["key"] == "age"}
+
+
+@pytest.mark.parametrize(
+    ("scenario", "level"),
+    [
+        ("clean_patient_grouped", "GREEN"),
+        ("weak_random_split_leakage", "RED"),
+        ("subgroup_scanner_degradation", "YELLOW"),
+        ("subgroup_density_degradation", "YELLOW"),
+    ],
+)
+def test_risk_level_follows_leakage_then_subgroup_flags(
+    scenario: str, level: str, subgroups_by_scenario: dict[str, list]
+) -> None:
+    risk = compute_risk(check_patient_leakage(_load(scenario)), subgroups_by_scenario[scenario])
+    assert risk["level"] == level
+    assert risk["reasons"]
+    assert all(isinstance(reason, str) and reason for reason in risk["reasons"])
 
 
 def test_fresh_seeds_flag_scanner_degradation_and_not_clean_tables() -> None:

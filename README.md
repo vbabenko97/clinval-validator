@@ -26,6 +26,8 @@ A subgroup is evaluated when it has at least 50 rows and both the subgroup and t
 
 A subgroup is flagged when `delta_vs_rest` is at or below −0.10 and the upper end of `delta_ci95` is below zero.
 
+On 30 tables from the bundled generator (seeds 7–36), 6 of 30 clean patient-grouped tables received a flag, and the injected M030 drop was missed in 4 of 30 scanner tables. These rates come from that generator, not from real data.
+
 `mean_predicted` (mean `y_prob`) and `observed_rate` (mean `y_true`) are calibration-in-the-large for that subgroup. They are reported and they do not flag. On `optimistic_site_shortcut`, mean `y_prob` by site runs from 0.331 to 0.754 while the observed positive rate runs from 0.97% to 2.3%.
 
 ## Split audit

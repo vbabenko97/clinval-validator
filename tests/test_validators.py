@@ -147,9 +147,22 @@ def test_pooled_metric_matches_manifest_overall_auc(scenario: str, expected_auc:
 
 # --- Check 3: subgroup degradation ---------------------------------------
 
-# make_scenarios.py builds the committed fixtures with seeds 1 through 6.
-_FRESH_CLEAN_SEEDS = (11, 12, 13, 14, 15)
-_FRESH_SCANNER_SEEDS = (7, 8, 9, 12, 13)
+# Seeds 7–11 were fixed before these outcomes were recorded. make_scenarios.py
+# uses seeds 1–6. On seeds 7–36 (30 tables) this branch misses M030 on 4
+# scanner tables (seeds 10, 11, 21, 22) and flags 6 clean tables (seeds 8, 10,
+# 19, 20, 30, 32). The subgroup logic on main misses M030 on 2 of 30 (seeds
+# 10, 22) and flags 6 of 30 clean tables (seeds 17, 19, 20, 25, 29, 30). A
+# change in the outcomes below means the detection behaviour changed and must
+# be reported in the commit message, not fixed by choosing other seeds.
+_FRESH_SEEDS = (7, 8, 9, 10, 11)
+_CLEAN_FLAGS = {
+    7: set(),
+    8: {("age", "80-89")},
+    9: set(),
+    10: {("age", "80-89")},
+    11: set(),
+}
+_SCANNER_M030_FLAGGED = {7: True, 8: True, 9: True, 10: False, 11: False}
 
 
 @pytest.fixture(scope="module")
@@ -223,30 +236,28 @@ def test_risk_level_follows_leakage_then_subgroup_flags(
     assert all(isinstance(reason, str) and reason for reason in risk["reasons"])
 
 
-def test_fresh_seeds_flag_scanner_degradation_and_not_clean_tables() -> None:
-    # Seeds 1–6 are the committed fixtures. These are other draws of the same
-    # generator configs: five clean tables, five with M030 degraded to AUC 0.62.
-    used_by_make_scenarios = {1, 2, 3, 4, 5, 6}
-    assert used_by_make_scenarios.isdisjoint(_FRESH_CLEAN_SEEDS)
-    assert used_by_make_scenarios.isdisjoint(_FRESH_SCANNER_SEEDS)
-
-    for seed in _FRESH_CLEAN_SEEDS:
+def test_fresh_seed_subgroup_outcomes_are_recorded() -> None:
+    """Record per-seed flags. Do not retune the seeds when a flag moves."""
+    for seed in _FRESH_SEEDS:
         df, _manifest = generate(GeneratorConfig(seed=seed, flaws=Flaws(split_strategy="patient")))
-        flagged = [sg for sg in check_subgroup_degradation(df) if sg["flagged"]]
-        assert flagged == []
+        flagged = {
+            (sg["key"], sg["value"]) for sg in check_subgroup_degradation(df) if sg["flagged"]
+        }
+        assert flagged == _CLEAN_FLAGS[seed]
 
     degradation = SubgroupDegradation("machine_id", ["M030"], target_auc=0.62)
-    for seed in _FRESH_SCANNER_SEEDS:
+    for seed in _FRESH_SEEDS:
         df, _manifest = generate(
             GeneratorConfig(
                 seed=seed,
                 flaws=Flaws(split_strategy="patient", subgroup_degradations=[degradation]),
             )
         )
-        subgroups = check_subgroup_degradation(df)
-        assert any(
-            sg["key"] == "machine_id" and sg["value"] == "M030" and sg["flagged"] for sg in subgroups
+        m030_flagged = any(
+            sg["key"] == "machine_id" and sg["value"] == "M030" and sg["flagged"]
+            for sg in check_subgroup_degradation(df)
         )
+        assert m030_flagged is _SCANNER_M030_FLAGGED[seed]
 
 
 # --- Check 2: split-quality audit ----------------------------------------

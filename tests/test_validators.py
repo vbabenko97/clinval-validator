@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -298,6 +299,20 @@ def test_audit_split_quality_structure_and_direction() -> None:
     )
     # The primary leakage signal for a random split is shared patients.
     assert check_patient_leakage(df)["overlapping_patient_ids"] > 0
+
+
+def test_audit_split_quality_leaves_out_one_class_samples() -> None:
+    # 200 patients, generator seed 6: the seed-0 sample and some other seeds'
+    # samples have no positive row, so their AUC is undefined.
+    df, _ = generate(GeneratorConfig(n_patients=200, seed=6))
+    assert validate_predictions(df) == []
+    audit = audit_split_quality(df)
+    assert audit["patient_disjoint_sample"] is None
+    assert audit["gap"] is None
+    low, high = audit["sample_range95"]
+    assert 0.0 <= low <= high <= 1.0
+    # NaN would serialize as a bare NaN token, which is not valid JSON.
+    json.dumps(run_checks(df), allow_nan=False)
 
 
 def test_audit_split_quality_is_reproducible() -> None:

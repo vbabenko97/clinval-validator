@@ -12,7 +12,7 @@ Rules:
 - risk.level was computed in Python from the leakage count and the subgroup flags only. RED means overlapping_patient_ids is greater than zero. YELLOW means there is no patient overlap and at least one subgroup is flagged. GREEN means neither. split_audit did not determine the level.
 - Do not soften genuine problems and do not inflate them. State the finding, then its consequence for what may be claimed.
 - Write for a researcher who trained the model, not for a lay audience. Assume they know AUC, calibration, and train/test splits.
-- split_audit is a diagnostic on fixed predictions. test_split_as_given is the AUC on rows with split "test". patient_disjoint_sample is the AUC on a seed-0 sample of patients drawn from all rows, so that sample includes training rows. sample_range95 is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. gap is test_split_as_given minus patient_disjoint_sample. The comparison cannot show that leakage inflated a metric, and it cannot show that a metric is free of inflation. Do not use it as evidence either way: do not write that it shows, confirms, or is consistent with inflation or with its absence. Do not call either AUC a corrected, true, or retrained result.
+- split_audit is a diagnostic on fixed predictions. test_split_as_given is the AUC on rows with split "test". patient_disjoint_sample is the AUC on a seed-0 sample of patients drawn from all rows, so that sample includes training rows. sample_range95 is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. gap is test_split_as_given minus patient_disjoint_sample. On a small table a sample can hold one class, where AUC is undefined: patient_disjoint_sample and gap are null when the seed-0 sample does, and sample_range95 leaves such seeds out and is null when every seed does. Say that the value is undefined; do not supply one. The comparison cannot show that leakage inflated a metric, and it cannot show that a metric is free of inflation. Do not use it as evidence either way: do not write that it shows, confirms, or is consistent with inflation or with its absence. Do not call either AUC a corrected, true, or retrained result.
 - mean_predicted and observed_rate are calibration-in-the-large for a subgroup (mean predicted probability and the observed positive rate). Mention them when you discuss calibration. They are not flags. Give both numbers when you describe a calibration gap. A mean_predicted many times larger than observed_rate is a large miscalibration; do not call it small or consistent.
 - pooled_metric is the AUC over all rows (rows: "all" means train, val and test together) and assumes every row's y_prob is a held-out or out-of-fold prediction. It is not the test-split AUC; that is split_audit.test_split_as_given.
 - subgroup_summary gives the counts: subgroups evaluated, subgroups flagged, and how many delta_ci95 intervals lie entirely below zero or entirely above zero. Take counts from it instead of counting the subgroups list. Say that every interval spans zero only when interval_below_zero and interval_above_zero are both 0.
@@ -24,9 +24,9 @@ Input JSON shape (fields may be absent if a check did not run):
   "split_audit": {
     "metric": "auc",
     "test_split_as_given": float,
-    "patient_disjoint_sample": float,
-    "sample_range95": [float, float],
-    "gap": float
+    "patient_disjoint_sample": float | null,
+    "sample_range95": [float, float] | null,
+    "gap": float | null
   },
   "subgroups": [{
     "key": "machine_id | site_id | density | age",
@@ -35,7 +35,7 @@ Input JSON shape (fields may be absent if a check did not run):
     "auc": float,
     "auc_rest": float,
     "delta_vs_rest": float,
-    "delta_ci95": [float, float],
+    "delta_ci95": [float, float] | null,
     "mean_predicted": float,
     "observed_rate": float,
     "flagged": bool

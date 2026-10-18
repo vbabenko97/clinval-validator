@@ -36,6 +36,8 @@ On 30 tables from the bundled generator (seeds 7–36; 2,000 patients and about 
 
 `test_split_as_given` is the AUC on rows with `split == "test"`. `patient_disjoint_sample` is the AUC on a seed-0 sample of 15% of patients drawn from every row, so the sample includes training rows. `sample_range95` is the 2.5th and 97.5th percentile of that sample AUC over seeds 0–199. `gap` is `test_split_as_given` minus `patient_disjoint_sample`.
 
+On a small table a sample can contain one class, where AUC is undefined. Those seeds are left out of `sample_range95`. When the seed-0 sample contains one class, `patient_disjoint_sample` and `gap` are `null`; when every seed's sample does, `sample_range95` is `null`.
+
 Both AUCs use the predictions already in the file. The audit does not measure how much leakage changed a metric, and it does not set the risk level.
 
 ## Input

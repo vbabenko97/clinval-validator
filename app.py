@@ -94,17 +94,25 @@ def main() -> None:
         # Same fixed predictions. The sample draws patients from every row,
         # including training rows, so it is not a second look at the test split.
         c3.metric("AUC, test split as given", f"{audit['test_split_as_given']:.3f}")
+        # A small table can draw a one-class sample; the audit then reports None.
+        sample = audit["patient_disjoint_sample"]
         c4.metric(
             "AUC, patient-disjoint sample",
-            f"{audit['patient_disjoint_sample']:.3f}",
-            delta=f"{audit['patient_disjoint_sample'] - audit['test_split_as_given']:+.3f}",
+            "n/a (one class)" if sample is None else f"{sample:.3f}",
+            delta=None if sample is None else f"{sample - audit['test_split_as_given']:+.3f}",
         )
-        low, high = audit["sample_range95"]
+        range95 = audit["sample_range95"]
+        range_text = (
+            ""
+            if range95 is None
+            else f"Over the seeds 0–199 whose sample holds both classes, that sample "
+            f"AUC stays within {range95[0]:.3f}–{range95[1]:.3f}. "
+        )
         st.caption(
             "Both AUCs use the same fixed predictions. The patient-disjoint "
             "sample is drawn from all rows, including training rows, so this "
             "comparison cannot measure how much leakage inflated the metric. "
-            f"Over seeds 0–199 that sample AUC stays within {low:.3f}–{high:.3f}. "
+            f"{range_text}"
             "Pooled AUC and the per-subgroup breakdown are in the JSON below."
         )
         if level == "RED":

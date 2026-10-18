@@ -56,9 +56,9 @@ class LeakageResult(TypedDict):
 class SplitAuditResult(TypedDict):
     metric: str
     test_split_as_given: float
-    patient_disjoint_sample: float
-    sample_range95: list[float]
-    gap: float
+    patient_disjoint_sample: float | None
+    sample_range95: list[float] | None
+    gap: float | None
 
 
 class SubgroupResult(TypedDict):
@@ -170,6 +170,11 @@ def audit_split_quality(df: pd.DataFrame) -> SplitAuditResult:
     over seeds 0–199. ``gap`` is ``test_split_as_given`` minus
     ``patient_disjoint_sample``.
 
+    On a small table a sample can hold one class, where AUC is undefined.
+    Such seeds are left out of ``sample_range95``. When the seed-0 sample
+    holds one class, ``patient_disjoint_sample`` and ``gap`` are None; when
+    every seed does, ``sample_range95`` is None.
+
     The comparison cannot measure how much leakage inflated a metric. Both
     numbers rescore predictions that already exist; they do not come from
     retraining under a patient-grouped split. The leakage count is
@@ -181,20 +186,33 @@ def audit_split_quality(df: pd.DataFrame) -> SplitAuditResult:
     test_split_as_given = float(roc_auc_score(y_true[test_rows], y_prob[test_rows]))
 
     groups = df["patient_id"]
-    sample_aucs = np.empty(200, dtype=np.float64)
+    sample_aucs: list[float] = []
+    patient_disjoint_sample: float | None = None
     for seed in range(200):
         splitter = GroupShuffleSplit(n_splits=1, test_size=0.15, random_state=seed)
         _, sample_idx = next(splitter.split(df, groups=groups))
-        sample_aucs[seed] = roc_auc_score(y_true[sample_idx], y_prob[sample_idx])
+        if not _both_classes(y_true[sample_idx]):
+            continue
+        auc = float(roc_auc_score(y_true[sample_idx], y_prob[sample_idx]))
+        if seed == 0:
+            patient_disjoint_sample = auc
+        sample_aucs.append(auc)
 
-    low, high = np.percentile(sample_aucs, [2.5, 97.5])
-    patient_disjoint_sample = float(sample_aucs[0])
+    sample_range95 = (
+        [float(bound) for bound in np.percentile(sample_aucs, [2.5, 97.5])]
+        if sample_aucs
+        else None
+    )
     return {
         "metric": "auc",
         "test_split_as_given": test_split_as_given,
         "patient_disjoint_sample": patient_disjoint_sample,
-        "sample_range95": [float(low), float(high)],
-        "gap": test_split_as_given - patient_disjoint_sample,
+        "sample_range95": sample_range95,
+        "gap": (
+            None
+            if patient_disjoint_sample is None
+            else test_split_as_given - patient_disjoint_sample
+        ),
     }
 
 

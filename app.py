@@ -80,16 +80,20 @@ def main() -> None:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Leaked patients", leakage["overlapping_patient_ids"])
         c2.metric("Leakage rate", f"{leakage['leakage_rate']:.1%}")
-        # The only like-for-like pair: one fixed y_prob, two evaluation populations.
-        # Labels stay split-agnostic because an uploaded file may already be grouped.
-        c3.metric("AUC, test split as given", f"{audit['random_split']:.3f}")
+        # Same fixed predictions. The sample draws patients from every row,
+        # including training rows, so it is not a second look at the test split.
+        c3.metric("AUC, test split as given", f"{audit['test_split_as_given']:.3f}")
         c4.metric(
-            "AUC, patient-disjoint subset",
-            f"{audit['grouped_split']:.3f}",
-            delta=f"{audit['grouped_split'] - audit['random_split']:+.3f}",
+            "AUC, patient-disjoint sample",
+            f"{audit['patient_disjoint_sample']:.3f}",
+            delta=f"{audit['patient_disjoint_sample'] - audit['test_split_as_given']:+.3f}",
         )
+        low, high = audit["sample_range95"]
         st.caption(
-            "No retraining — only the evaluation population changes. "
+            "Both AUCs use the same fixed predictions. The patient-disjoint "
+            "sample is drawn from all rows, including training rows, so this "
+            "comparison cannot measure how much leakage inflated the metric. "
+            f"Over seeds 0–199 that sample AUC stays within {low:.3f}–{high:.3f}. "
             "Pooled AUC and the per-subgroup breakdown are in the JSON below."
         )
         if leakage["overlapping_patient_ids"]:

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
@@ -37,9 +38,7 @@ __all__ = [
 
 
 # --- Report JSON contract -------------------------------------------------
-# Shape mirrors prompts/opus-4-8/reporter_system_prompt.md exactly. The
-# validators produce this payload; the reporter consumes it. Do not add fields
-# beyond the ones documented there.
+# The validators produce this payload; the reporter sends it to Claude.
 
 
 class LeakageResult(TypedDict):
@@ -49,8 +48,9 @@ class LeakageResult(TypedDict):
 
 class SplitAuditResult(TypedDict):
     metric: str
-    random_split: float
-    grouped_split: float
+    test_split_as_given: float
+    patient_disjoint_sample: float
+    sample_range95: list[float]
     gap: float
 
 
@@ -135,30 +135,40 @@ def check_patient_leakage(df: pd.DataFrame) -> LeakageResult:
 
 
 def audit_split_quality(df: pd.DataFrame) -> SplitAuditResult:
-    """Recompute the headline metric under the file's split vs a grouped split.
+    """Compare two AUCs computed from the same fixed predictions.
 
-    Both AUCs read the same fixed ``y_prob`` on two different test subsets, so
-    this measures how sensitive the headline metric is to the choice of split —
-    it is a diagnostic, not a retrained proof of split-induced optimism.
-    ``random_split`` uses the test rows as given in the file; ``grouped_split``
-    re-partitions by ``patient_id`` with a fixed seed so no patient spans the
-    fold boundary. The rigorous leakage signal is :func:`check_patient_leakage`;
-    ``gap`` can be small or even negative when the leak is structural patient
-    overlap rather than an inflated ``y_prob``.
+    ``test_split_as_given`` is the AUC on rows with ``split == "test"``.
+    ``patient_disjoint_sample`` is the AUC on a seed-0 sample of 15% of
+    patients drawn from every row, so that sample includes training rows.
+    ``sample_range95`` is the 2.5th and 97.5th percentile of that sample AUC
+    over seeds 0–199. ``gap`` is ``test_split_as_given`` minus
+    ``patient_disjoint_sample``.
+
+    The comparison cannot measure how much leakage inflated a metric. Both
+    numbers rescore predictions that already exist; they do not come from
+    retraining under a patient-grouped split. The leakage count is
+    :func:`check_patient_leakage`.
     """
-    test_rows = df[df["split"] == "test"]
-    random_split = float(roc_auc_score(test_rows["y_true"], test_rows["y_prob"]))
+    y_true = df["y_true"].to_numpy()
+    y_prob = df["y_prob"].to_numpy()
+    test_rows = df["split"].to_numpy() == "test"
+    test_split_as_given = float(roc_auc_score(y_true[test_rows], y_prob[test_rows]))
 
-    splitter = GroupShuffleSplit(n_splits=1, test_size=0.15, random_state=0)
-    _, grouped_test_idx = next(splitter.split(df, groups=df["patient_id"]))
-    grouped_fold = df.iloc[grouped_test_idx]
-    grouped_split = float(roc_auc_score(grouped_fold["y_true"], grouped_fold["y_prob"]))
+    groups = df["patient_id"]
+    sample_aucs = np.empty(200, dtype=np.float64)
+    for seed in range(200):
+        splitter = GroupShuffleSplit(n_splits=1, test_size=0.15, random_state=seed)
+        _, sample_idx = next(splitter.split(df, groups=groups))
+        sample_aucs[seed] = roc_auc_score(y_true[sample_idx], y_prob[sample_idx])
 
+    low, high = np.percentile(sample_aucs, [2.5, 97.5])
+    patient_disjoint_sample = float(sample_aucs[0])
     return {
         "metric": "auc",
-        "random_split": random_split,
-        "grouped_split": grouped_split,
-        "gap": random_split - grouped_split,
+        "test_split_as_given": test_split_as_given,
+        "patient_disjoint_sample": patient_disjoint_sample,
+        "sample_range95": [float(low), float(high)],
+        "gap": test_split_as_given - patient_disjoint_sample,
     }
 
 

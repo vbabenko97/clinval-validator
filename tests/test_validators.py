@@ -164,12 +164,14 @@ def test_audit_split_quality_structure_and_direction() -> None:
     df = _load("weak_random_split_leakage")
     audit = audit_split_quality(df)
     assert audit["metric"] == "auc"
-    # Both AUCs are finite probabilities computed over the same fixed y_prob.
-    assert 0.0 < audit["random_split"] < 1.0
-    assert 0.0 < audit["grouped_split"] < 1.0
-    # gap is exactly the signed difference (may be small or negative — the leak
-    # here is structural patient overlap, not an inflated y_prob).
-    assert audit["gap"] == pytest.approx(audit["random_split"] - audit["grouped_split"])
+    # Both AUCs are computed from the same fixed y_prob.
+    assert 0.0 < audit["test_split_as_given"] < 1.0
+    assert 0.0 < audit["patient_disjoint_sample"] < 1.0
+    low, high = audit["sample_range95"]
+    assert low <= audit["patient_disjoint_sample"] <= high
+    assert audit["gap"] == pytest.approx(
+        audit["test_split_as_given"] - audit["patient_disjoint_sample"]
+    )
     # The primary leakage signal for a random split is shared patients.
     assert check_patient_leakage(df)["overlapping_patient_ids"] > 0
 

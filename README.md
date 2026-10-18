@@ -1,6 +1,6 @@
 # clinval-validator
 
-ClinVal Validator reads a model's `predictions.csv` and reports two failure modes that make a clinical-AI performance claim unsafe: the same patient in both the train and test splits, and a subgroup whose AUC is lower than the rest of the table. Python computes the metrics, the flags, and the risk level. Claude is instructed to turn that JSON into prose and to cite only numbers present in it. Nothing in this repository checks the text Claude returns.
+ClinVal Validator reads a model's `predictions.csv` and reports two failure modes that make a clinical-AI performance claim unsafe: the same patient in both the train and test splits, and a subgroup whose AUC is lower than the rest of the table. Python computes the metrics, the flags, and the risk level. Claude is instructed to turn that JSON into prose and to cite only numbers present in it. Nothing in this repository checks the text Claude returns. The reporter calls Claude Opus 5.5 (`claude-opus-5-5`) at low effort; if a safety classifier declines a request, the API reruns it on the model Anthropic recommends for that refusal category.
 
 ![ClinVal Validator on weak_random_split_leakage: 940 leaked patients, test-split AUC 0.827, patient-disjoint sample AUC 0.899, and a RED banner](docs/images/app-weak-random-split-leakage.png)
 

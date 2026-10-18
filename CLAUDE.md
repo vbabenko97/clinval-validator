@@ -15,7 +15,7 @@ Named user: a clinical-AI researcher / radiology-lab PhD student who trained a m
 **Python computes. Claude explains.**
 
 - All metrics, statistical tests, pass/fail flags, and the risk level are computed by deterministic Python. Never ask an LLM to compute AUC, run a bootstrap, or decide a flag or the risk level.
-- Claude (Anthropic API, `claude-opus-4-8`) is used **only** to turn the deterministic layer's structured JSON into prose: the risk report, reviewer-style critique, next-step suggestions. See the reporter contract in [prompts/opus-4-8/reporter_system_prompt.md](prompts/opus-4-8/reporter_system_prompt.md) — it may cite only numbers present in the JSON.
+- Claude (Anthropic API, `claude-opus-5-5` at effort `low`, with server-side refusal fallback) is used **only** to turn the deterministic layer's structured JSON into prose: the risk report, reviewer-style critique, next-step suggestions. See the reporter contract in [prompts/reporter_system_prompt.md](prompts/reporter_system_prompt.md) — it may cite only numbers present in the JSON.
 - Layers stay cleanly separable: `clinval_validators/` (pure Python, no network, runs fully offline) and `reporter/` (the only code that touches the network).
 
 ## Repo map — current state
@@ -23,7 +23,7 @@ Named user: a clinical-AI researcher / radiology-lab PhD student who trained a m
 - [clinval_validators/](clinval_validators/) — deterministic checks. `run_checks` returns leakage, the split audit, subgroups, the pooled AUC, and `risk`.
 - [cli.py](cli.py) — `clinval-validate`. Prints the payload and exits 1 when `ANTHROPIC_API_KEY` is unset or Claude returns no complete report (`ReportNotRenderedError`: cut off at `max_tokens`, refused, or no text). Exits 2 when `validate_predictions` reports a problem.
 - [app.py](app.py) — Streamlit UI over the same checks. The typed API key is passed into the reporter and is not written to `os.environ`.
-- [reporter/](reporter/) — the only code that calls the network. Loads the two runtime prompts in [prompts/opus-4-8/](prompts/opus-4-8/); see [prompts/README.md](prompts/README.md).
+- [reporter/](reporter/) — the only code that calls the network. Loads the two runtime prompts in [prompts/](prompts/); see [prompts/README.md](prompts/README.md).
 - [claude-science-artifacts/](claude-science-artifacts/) — synthetic-data generator and the committed scenario oracle (`scenarios/*.csv`, manifests, `_scenario_summary.csv`). Do not regenerate those fixtures to make a test pass.
 - [rsna_to_predictions.py](rsna_to_predictions.py) — local-only adapter for an RSNA `train.csv`. Outputs are gitignored.
 - [tests/](tests/) — unit tests, including fresh generator seeds for the subgroup flag.
@@ -57,6 +57,8 @@ python claude-science-artifacts/leakage_generator.py --out predictions.csv \
 - `_FLAG_DELTA` (−0.10) and `_MIN_SUBGROUP_N` (50) were calibrated on the committed fixtures. Do not change them to make a test pass.
 - `reporter/report.py` sends only the text after the first `---` of a prompt file.
 - A one-sided Bonferroni correction across subgroups was measured on generator seeds 7–36 and not adopted. It cut clean-table flags from 6 to 3 of 30, but M030 detection fell from 26 to 21 of 30 and density detection from 21 to 12 of 30, and `subgroup_density_degradation` was no longer flagged. Re-measure on the same seeds before changing the flag rule.
+- The reporter model was chosen in October 2026 from a blind review of 24 live reports per configuration (4 scenarios × 2 modes × 3 repeats). Major errors: Opus 5.5 low 0, Opus 5.5 medium 0, Sonnet 5.5 with and without thinking 0, Opus 4.8 1, Haiku 5.5 2–3. Opus 5.5 low had the most error-free reports (19 of 24) at $40 per 1,000 reports, against $46 for Opus 4.8; Sonnet 5.5 without thinking is the cheaper option ($18, 14 of 24 error-free). Re-run that comparison before changing `MODEL` or `EFFORT`.
+- Opus 5.5 always thinks: `thinking: {"type": "disabled"}` is a 400. Its replies start with thinking blocks, so the reporter joins the `text` blocks, and `MAX_TOKENS` must leave room for the thinking.
 
 ## Data & schema
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Spine of the 3-minute demo: a GREEN control, then the leakage scenario.
-# Requires ANTHROPIC_API_KEY (the report step calls claude-opus-4-8).
+# Requires ANTHROPIC_API_KEY (the report step calls Claude; see MODEL in reporter/report.py).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

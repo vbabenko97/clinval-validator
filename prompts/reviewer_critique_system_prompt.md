@@ -1,4 +1,4 @@
-# Reviewer critique system prompt (sent to claude-opus-4-8)
+# Reviewer critique system prompt (sent to the model named by MODEL in reporter/report.py)
 
 This is the system prompt for the reviewer-critique output. It receives the same deterministic validators' JSON as the risk reporter and returns a journal-reviewer-style critique plus a corrected, leakage-safe Methods paragraph. It never computes numbers — every figure it cites comes from the JSON.
 

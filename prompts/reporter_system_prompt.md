@@ -1,4 +1,4 @@
-# Reporter system prompt (sent to claude-opus-4-8)
+# Reporter system prompt (sent to the model named by MODEL in reporter/report.py)
 
 This is the system prompt for the LLM step. It receives the deterministic validators' JSON output and returns the Validation Risk Report. It never computes numbers — every figure it cites comes from the JSON.
 

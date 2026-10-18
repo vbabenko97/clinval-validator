@@ -1,8 +1,8 @@
 """LLM reporting step: turn the validators' JSON payload into prose.
 
 This is the only module in the project that touches the network. It sends the
-deterministic report payload to Claude (``claude-opus-4-8``) under one of two
-system prompts and returns the rendered text: :func:`render_report` produces the
+deterministic report payload to Claude (``claude-opus-5-5`` at low effort) under
+one of two system prompts and returns the rendered text: :func:`render_report` produces the
 GREEN/YELLOW/RED Validation Risk Report, :func:`render_reviewer_critique`
 produces a journal-reviewer critique with a corrected Methods paragraph. Neither
 computes a metric — every number in the output comes from the payload.
@@ -20,12 +20,19 @@ from anthropic import Anthropic
 if TYPE_CHECKING:
     from clinval_validators import ReportPayload
 
-MODEL = "claude-opus-4-8"
-# The longest live Opus 4.8 report used 998 output tokens, so 1024 left almost no
-# margin. Only generated tokens are billed; the cap is a ceiling, not a cost.
+MODEL = "claude-opus-5-5"
+# Opus 5.5 always thinks; effort sets how much. In a blind review of 24 live
+# reports per setting, neither "low" nor "medium" made a major error, and "low"
+# cost less ($40 vs $45 per 1,000 reports).
+EFFORT = "low"
+# Thinking counts toward max_tokens. The longest live low-effort reply used 1,292
+# output tokens. Only generated tokens are billed; the cap is a ceiling, not a cost.
 MAX_TOKENS = 4096
+# On a safety-classifier refusal the API reruns the request on the model Anthropic
+# recommends for that refusal category, instead of returning the refusal.
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
 API_KEY_ENV = "ANTHROPIC_API_KEY"
-_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts" / "opus-4-8"
+_PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "reporter_system_prompt.md"
 CRITIQUE_SYSTEM_PROMPT_PATH = _PROMPTS_DIR / "reviewer_critique_system_prompt.md"
 
@@ -35,6 +42,7 @@ __all__ = [
     "MissingAPIKeyError",
     "ReportNotRenderedError",
     "MODEL",
+    "EFFORT",
     "MAX_TOKENS",
     "API_KEY_ENV",
     "SYSTEM_PROMPT_PATH",
@@ -72,7 +80,7 @@ def _load_system_prompt(path: Path) -> str:
 def _render(
     payload: ReportPayload, system_prompt_path: Path, api_key: str | None = None
 ) -> str:
-    """Send the deterministic payload to ``claude-opus-4-8`` under one prompt.
+    """Send the deterministic payload to :data:`MODEL` under one prompt.
 
     ``api_key`` overrides ``ANTHROPIC_API_KEY`` when it is passed, so a browser
     session can use the key typed into that session without writing
@@ -89,14 +97,19 @@ def _render(
         raise MissingAPIKeyError(f"{API_KEY_ENV} is not set in the environment.")
 
     client = Anthropic(api_key=api_key)
-    message = client.messages.create(
+    message = client.beta.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
         system=_load_system_prompt(system_prompt_path),
         messages=[{"role": "user", "content": json.dumps(payload)}],
+        output_config={"effort": EFFORT},
+        betas=[FALLBACK_BETA],
+        # The SDK types `fallbacks` as a list of models; the "default" mode is a
+        # string the API accepts, so it goes in the raw body.
+        extra_body={"fallbacks": "default"},
     )
-    # A model that thinks returns a thinking block before the text, so the first
-    # block is not always the report.
+    # Opus 5.5 returns thinking blocks (and, after a fallback, a fallback block)
+    # before the text, so the first block is not always the report.
     text = "".join(block.text for block in message.content if block.type == "text")
     if message.stop_reason in ("max_tokens", "refusal") or not text:
         raise ReportNotRenderedError(

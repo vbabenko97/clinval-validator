@@ -11,6 +11,7 @@ import pytest
 import reporter
 from reporter import (
     CRITIQUE_SYSTEM_PROMPT_PATH,
+    EFFORT,
     MAX_TOKENS,
     MODEL,
     SYSTEM_PROMPT_PATH,
@@ -37,7 +38,7 @@ def _fake_client(monkeypatch, content: list, stop_reason: str = "end_turn") -> d
     class FakeAnthropic:
         def __init__(self, api_key=None):
             captured["api_key"] = api_key
-            self.messages = FakeMessages()
+            self.beta = SimpleNamespace(messages=FakeMessages())
 
     monkeypatch.setattr(reporter.report, "Anthropic", FakeAnthropic)
     return captured
@@ -121,8 +122,14 @@ def test_render_report_sends_payload_json_to_opus(monkeypatch) -> None:
 
     assert report_text == "RED: leakage present"
     assert captured["api_key"] == "test-key"
-    assert captured["model"] == MODEL == "claude-opus-4-8"
+    assert captured["model"] == MODEL == "claude-opus-5-5"
     assert captured["max_tokens"] == MAX_TOKENS == 4096
+    # Opus 5.5 rejects thinking={"type": "disabled"}; effort is the only control.
+    assert "thinking" not in captured
+    assert captured["output_config"] == {"effort": EFFORT} == {"effort": "low"}
+    # A classifier refusal is retried on Anthropic's recommended model for its category.
+    assert captured["betas"] == ["server-side-fallback-2026-07-01"]
+    assert captured["extra_body"] == {"fallbacks": "default"}
 
     user_message = captured["messages"][0]
     assert user_message["role"] == "user"
@@ -163,7 +170,8 @@ def test_text_after_a_thinking_block_is_returned(monkeypatch) -> None:
     # raise AttributeError on it.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     thinking = SimpleNamespace(type="thinking", thinking="")
-    _fake_client(monkeypatch, [thinking, _text("1. Overall risk"), _text(" RED")])
+    fallback = SimpleNamespace(type="fallback")  # present when a refusal was rerun on another model
+    _fake_client(monkeypatch, [thinking, fallback, _text("1. Overall risk"), _text(" RED")])
     assert render_report(SAMPLE_PAYLOAD) == "1. Overall risk RED"
 
 
@@ -190,8 +198,9 @@ def test_render_reviewer_critique_sends_payload_json_to_opus(monkeypatch) -> Non
 
     assert critique_text == "Reviewer verdict: reject"
     assert captured["api_key"] == "test-key"
-    assert captured["model"] == MODEL == "claude-opus-4-8"
+    assert captured["model"] == MODEL
     assert captured["max_tokens"] == MAX_TOKENS
+    assert captured["output_config"] == {"effort": EFFORT}
 
     user_message = captured["messages"][0]
     assert user_message["role"] == "user"

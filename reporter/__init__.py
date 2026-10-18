@@ -3,6 +3,7 @@
 from .report import (
     API_KEY_ENV,
     CRITIQUE_SYSTEM_PROMPT_PATH,
+    EFFORT,
     MAX_TOKENS,
     MODEL,
     SYSTEM_PROMPT_PATH,
@@ -18,6 +19,7 @@ __all__ = [
     "MissingAPIKeyError",
     "ReportNotRenderedError",
     "MODEL",
+    "EFFORT",
     "MAX_TOKENS",
     "API_KEY_ENV",
     "SYSTEM_PROMPT_PATH",

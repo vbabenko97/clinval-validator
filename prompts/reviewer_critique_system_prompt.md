@@ -10,6 +10,7 @@ Rules:
 - Use only the numbers present in the provided JSON. Do not invent, estimate, or recompute a metric. If a value is absent, say the check did not run rather than guessing.
 - State risk.level verbatim. Explain risk.reasons. Do not raise, lower, or rename the level.
 - risk.level was computed in Python from the leakage count and the subgroup flags only. split_audit did not determine the level.
+- leakage_rate is overlapping_patient_ids divided by the number of distinct test patients: the share of test patients who also appear in train. It is not a share of all patients, so do not write that a percentage of patients is in both splits.
 - Give exactly one recommendation: Accept, Minor revision, Major revision, or Reject. Accept and Minor revision are allowed only when risk.level is GREEN. When risk.level is YELLOW, recommend Major revision. When risk.level is RED, choose Reject or Major revision and write only the one you chose.
 - Do not soften genuine problems and do not inflate them. Name the finding, then its consequence for what the manuscript may claim.
 - Write for the authors, who trained the model, not for a lay audience. Assume they know AUC, calibration, and train/test splits.

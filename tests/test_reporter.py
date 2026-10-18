@@ -108,10 +108,13 @@ def test_prompts_name_the_fields_python_computes() -> None:
 
 
 def test_prompts_keep_the_rules_live_reports_broke() -> None:
-    # Live reports read the split audit as evidence of no inflation and left the
-    # RED critique recommendation as "Reject or Major revision".
+    # Live reports read the split audit as evidence of no inflation, called the
+    # leakage rate a share of all patients, and left the RED critique
+    # recommendation as "Reject or Major revision".
     for path in (SYSTEM_PROMPT_PATH, CRITIQUE_SYSTEM_PROMPT_PATH):
-        assert "free of inflation" in path.read_text(encoding="utf-8"), path.name
+        text = path.read_text(encoding="utf-8")
+        assert "free of inflation" in text, path.name
+        assert "share of test patients" in text, path.name
     assert "exactly one recommendation" in CRITIQUE_SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
 
 
